@@ -15,20 +15,14 @@ return [
     |--------------------------------------------------------------------------
     | Encryption Keys
     |--------------------------------------------------------------------------
+    | If PASSPORT_PRIVATE_KEY / PASSPORT_PUBLIC_KEY env vars are set, Passport
+    | uses those values as the raw PEM key content.
+    | If they are null, Passport automatically reads the key files from:
+    |   storage/oauth-private.key  and  storage/oauth-public.key
     */
-    'private_key' => env('PASSPORT_PRIVATE_KEY', file_exists(storage_path('oauth-private.key')) ? storage_path('oauth-private.key') : null),
+    'private_key' => env('PASSPORT_PRIVATE_KEY'),
 
-    'public_key' => env('PASSPORT_PUBLIC_KEY', file_exists(storage_path('oauth-public.key')) ? storage_path('oauth-public.key') : null),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Passport Client Credentials
-    |--------------------------------------------------------------------------
-    */
-    'personal_access_client' => [
-        'id' => env('PASSPORT_PERSONAL_ACCESS_CLIENT_ID', '019f978e-eeb7-7398-ad9c-35fa42b797bb'),
-        'secret' => env('PASSPORT_PERSONAL_ACCESS_CLIENT_SECRET', '$2y$12$daDB5mAeJaAC.KoLCdRiMOG8v7p2SLzWjgapmwI7w4i4a0IjYyxv2'),
-    ],
+    'public_key' => env('PASSPORT_PUBLIC_KEY'),
 
     /*
     |--------------------------------------------------------------------------

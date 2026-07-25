@@ -52,19 +52,8 @@ class AuthController extends Controller
                 'status'   => User::STATUS_PASSWORD_UNCHANGED, // force password change on first login
             ]);
 
-            try {
-                $token = $user->createToken('auth_token')->accessToken;
-            } catch (\Throwable $tokenException) {
-                // Diagnostic: return real createToken error so we can see it on Render
-                return HelperFunction::response(
-                    null,
-                    $tokenException->getFile() . ':' . $tokenException->getLine(),
-                    'createToken failed: ' . $tokenException->getMessage(),
-                    'error',
-                    '501',
-                    Response::HTTP_INTERNAL_SERVER_ERROR
-                );
-            }
+            $token = $user->createToken('auth_token')->accessToken;
+
 
             return HelperFunction::response(
                 [
