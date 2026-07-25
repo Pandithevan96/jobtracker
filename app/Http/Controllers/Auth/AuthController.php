@@ -56,7 +56,7 @@ class AuthController extends Controller
 
             return HelperFunction::response(
                 [
-                    'user'         => $user,
+                    'user'         => $user->toArray(),
                     'access_token' => $token,
                 ],
                 null,
@@ -138,7 +138,7 @@ class AuthController extends Controller
 
         return HelperFunction::response(
             [
-                'user'                   => $user,
+                'user'                   => $user->toArray(),
                 'access_token'           => $token,
                 'password_change_required' => $user->isPasswordUnchanged(),
             ],
