@@ -11,10 +11,8 @@ if [ ! -f storage/oauth-private.key ]; then
     php artisan passport:keys --force
 fi
 
-# Ensure www-data (Apache) owns the storage directory and oauth keys
-chown -R www-data:www-data storage/ bootstrap/cache/
-chmod 600 storage/oauth-private.key || true
-chmod 644 storage/oauth-public.key || true
+# Ensure storage directory permissions
+chmod -R 777 storage/ bootstrap/cache/
 
-# Execute main process (Apache)
-exec "$@"
+# Execute Laravel native HTTP server directly (bypassing Apache mpm_prefork worker crashes)
+exec php artisan serve --host=0.0.0.0 --port=80
