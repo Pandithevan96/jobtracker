@@ -3,7 +3,7 @@
 namespace App\Helpers;
 
 use App\Models\User\RolePermission;
-use Exception;
+use Throwable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -32,7 +32,7 @@ class HelperFunction
             $ciphertext = openssl_encrypt(json_encode($data), 'AES-256-ECB', $key, 0, '');
 
             return bin2hex(base64_decode($ciphertext));
-        } catch (Exception $exception) {
+        } catch (Throwable $exception) {
             Log::error($exception->getMessage(), ['data' => $data, 'client_secret' => $client_secret]);
             return '';
         }
@@ -54,7 +54,7 @@ class HelperFunction
             $decrypted = openssl_decrypt($ciphertext, 'AES-256-ECB', $key, 0, '');
 
             return json_decode($decrypted, true);
-        } catch (Exception $exception) {
+        } catch (Throwable $exception) {
             Log::error($exception->getMessage(), ['encrypted_data' => $encryptedData, 'mac' => $mac]);
             return null;
         }
@@ -67,7 +67,7 @@ class HelperFunction
     {
         try {
             return hash('sha256', $data . $client_secret);
-        } catch (Exception $exception) {
+        } catch (Throwable $exception) {
             Log::error($exception->getMessage(), ['data' => $data]);
             return '';
         }
@@ -95,10 +95,10 @@ class HelperFunction
                 $response['error'] = $data;
             }
 
-            $response['timestamp'] = now()->toISOString();
+            $response['timestamp'] = now()->toIso8601String();
 
             return response()->json($response, $http_code);
-        } catch (Exception $exception) {
+        } catch (Throwable $exception) {
             Log::error($exception->getMessage());
             return response()->json(['status' => 'error', 'message' => $exception->getMessage(), 'code' => '002'], $http_code);
         }
@@ -117,7 +117,7 @@ class HelperFunction
                 ->first();
 
             return $permission;
-        } catch (Exception $exception) {
+        } catch (Throwable $exception) {
             Log::error($exception->getMessage());
             return null;
         }
