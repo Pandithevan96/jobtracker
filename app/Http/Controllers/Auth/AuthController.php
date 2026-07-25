@@ -19,51 +19,62 @@ class AuthController extends Controller
      */
     public function register(Request $request)
     {
-        $validation = Validator::make($request->all(), [
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|string|email|unique:users,email',
-            'phone'    => 'nullable|string|max:20',
-            'gender'   => 'nullable|integer|in:1,2,3',   // 1-Male, 2-Female, 3-Other
-            'password' => 'required|string|min:8',
-            'role_id'  => 'nullable|integer|in:1,2,3',   // 1-Admin, 2-Principal, 3-Vendor
-        ]);
+        try {
+            $validation = Validator::make($request->all(), [
+                'name'     => 'required|string|max:255',
+                'email'    => 'required|string|email|unique:users,email',
+                'phone'    => 'nullable|string|max:20',
+                'gender'   => 'nullable|integer|in:1,2,3',   // 1-Male, 2-Female, 3-Other
+                'password' => 'required|string|min:8',
+                'role_id'  => 'nullable|integer|in:1,2,3',   // 1-Admin, 2-Principal, 3-Vendor
+            ]);
 
-        if ($validation->fails()) {
+            if ($validation->fails()) {
+                return HelperFunction::response(
+                    null,
+                    null,
+                    $validation->errors()->first(),
+                    'error',
+                    '001',
+                    Response::HTTP_BAD_REQUEST
+                );
+            }
+
+            $data = $validation->validated();
+
+            $user = User::create([
+                'name'     => $data['name'],
+                'email'    => $data['email'],
+                'phone'    => $data['phone'] ?? null,
+                'gender'   => $data['gender'] ?? null,
+                'password' => Hash::make($data['password']),
+                'role_id'  => $data['role_id'] ?? User::ROLE_PRINCIPAL,
+                'status'   => User::STATUS_PASSWORD_UNCHANGED, // force password change on first login
+            ]);
+
+            $token = $user->createToken('auth_token')->accessToken;
+
+            return HelperFunction::response(
+                [
+                    'user'         => $user,
+                    'access_token' => $token,
+                ],
+                null,
+                'User registered successfully',
+                'success',
+                '000',
+                Response::HTTP_CREATED
+            );
+        } catch (\Throwable $e) {
             return HelperFunction::response(
                 null,
-                null,
-                $validation->errors()->first(),
+                $e->getFile() . ':' . $e->getLine(),
+                $e->getMessage(),
                 'error',
-                '001',
-                Response::HTTP_BAD_REQUEST
+                '500',
+                Response::HTTP_INTERNAL_SERVER_ERROR
             );
         }
-
-        $data = $validation->validated();
-
-        $user = User::create([
-            'name'     => $data['name'],
-            'email'    => $data['email'],
-            'phone'    => $data['phone'] ?? null,
-            'gender'   => $data['gender'] ?? null,
-            'password' => Hash::make($data['password']),
-            'role_id'  => $data['role_id'] ?? User::ROLE_PRINCIPAL,
-            'status'   => User::STATUS_PASSWORD_UNCHANGED, // force password change on first login
-        ]);
-
-        $token = $user->createToken('auth_token')->accessToken;
-
-        return HelperFunction::response(
-            [
-                'user'         => $user,
-                'access_token' => $token,
-            ],
-            null,
-            'User registered successfully',
-            'success',
-            '000',
-            Response::HTTP_CREATED
-        );
     }
 
     /**
