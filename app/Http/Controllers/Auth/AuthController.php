@@ -61,21 +61,16 @@ class AuthController extends Controller
                 ];
             });
 
-            return response()->json([
+            return response(json_encode([
                 'status'    => 'success',
                 'message'   => 'User registered successfully',
                 'code'      => '000',
                 'data'      => $result,
                 'mac'       => null,
                 'timestamp' => now()->toIso8601String(),
-            ], 201);
+            ]), 201)->header('Content-Type', 'application/json');
         } catch (\Throwable $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => $e->getMessage(),
-                'file'    => $e->getFile() . ':' . $e->getLine(),
-                'code'    => '500',
-            ], 500);
+            return response($e->getMessage(), 500)->header('Content-Type', 'text/plain');
         }
     }
 
