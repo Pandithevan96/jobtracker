@@ -63,7 +63,7 @@ class AuthController extends Controller
                 'User registered successfully',
                 'success',
                 '000',
-                Response::HTTP_CREATED
+                Response::HTTP_OK
             );
         } catch (\Throwable $e) {
             return HelperFunction::response(
