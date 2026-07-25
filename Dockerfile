@@ -29,6 +29,9 @@ WORKDIR /var/www/html
 # Copy project files
 COPY . /var/www/html
 
+# Make docker-entrypoint.sh executable
+RUN chmod +x /var/www/html/docker-entrypoint.sh
+
 # Install Composer dependencies
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 RUN composer install --no-dev --optimize-autoloader --no-interaction
@@ -39,4 +42,5 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 
 EXPOSE 80
 
+ENTRYPOINT ["/var/www/html/docker-entrypoint.sh"]
 CMD ["apache2-foreground"]
