@@ -52,17 +52,7 @@ class AuthController extends Controller
                 'status'   => User::STATUS_PASSWORD_UNCHANGED, // force password change on first login
             ]);
 
-            try {
-                $token = $user->createToken('auth_token')->accessToken;
-            } catch (\Throwable $tokenException) {
-                return response()->json([
-                    'error_type' => 'TOKEN_CREATION_FAILED',
-                    'message'    => $tokenException->getMessage(),
-                    'file'       => $tokenException->getFile(),
-                    'line'       => $tokenException->getLine(),
-                ], 500);
-            }
-
+            $token = $user->createToken('auth_token')->plainTextToken;
 
             return HelperFunction::response(
                 [
@@ -144,7 +134,7 @@ class AuthController extends Controller
             );
         }
 
-        $token = $user->createToken('auth_token')->accessToken;
+        $token = $user->createToken('auth_token')->plainTextToken;
 
         return HelperFunction::response(
             [

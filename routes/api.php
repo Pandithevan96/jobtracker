@@ -30,10 +30,10 @@ Route::prefix('v1')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Protected Routes (Passport token required)
+    | Protected Routes (Bearer token required)
     |--------------------------------------------------------------------------
     */
-    Route::middleware('auth:api')->group(function () {
+    Route::middleware('auth:sanctum')->group(function () {
 
         Route::post('logout',          'Auth\AuthController@logout');
         Route::post('me',              'Auth\AuthController@me');
