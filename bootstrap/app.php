@@ -4,6 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -22,14 +23,16 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->render(function (\Throwable $e, Request $request) {
-            if ($request->is('api/*')) {
+        $exceptions->respond(function (Response $response, \Throwable $e, Request $request) {
+            if ($request->is('api/*') && $response->getStatusCode() === 500) {
                 return response()->json([
-                    'status'  => 'error',
-                    'message' => $e->getMessage(),
-                    'file'    => $e->getFile() . ':' . $e->getLine(),
-                    'code'    => '500',
+                    'status'    => 'error',
+                    'exception' => get_class($e),
+                    'message'   => $e->getMessage(),
+                    'file'      => $e->getFile() . ':' . $e->getLine(),
+                    'trace'     => array_slice(array_map(fn($t) => ($t['file'] ?? '') . ':' . ($t['line'] ?? '') . ' (' . ($t['function'] ?? '') . ')', $e->getTrace()), 0, 10),
                 ], 500);
             }
+            return $response;
         });
     })->create();
