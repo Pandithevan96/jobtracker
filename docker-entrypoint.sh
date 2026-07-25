@@ -7,5 +7,10 @@ if [ ! -f storage/oauth-private.key ]; then
     php artisan passport:keys --force
 fi
 
+# Ensure www-data (Apache) owns the storage directory and oauth keys
+chown -R www-data:www-data storage/
+chmod 600 storage/oauth-private.key || true
+chmod 644 storage/oauth-public.key || true
+
 # Execute main process (Apache)
 exec "$@"
