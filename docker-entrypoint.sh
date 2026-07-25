@@ -14,5 +14,5 @@ fi
 # Ensure storage directory permissions
 chmod -R 777 storage/ bootstrap/cache/
 
-# Execute Laravel native HTTP server directly (bypassing Apache mpm_prefork worker crashes)
-exec php artisan serve --host=0.0.0.0 --port=80
+# Execute CMD process (php artisan serve)
+exec "$@"
