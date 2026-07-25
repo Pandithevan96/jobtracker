@@ -1,0 +1,735 @@
+{
+  "info": {
+    "name": "JobTrack API",
+    "description": "Complete Postman Collection for JobTrack SaaS Backend API. All endpoints use POST method. ID values must be passed in the request body (no URL parameters). Base URL: http://localhost/jobtracker/public/api/v1\n\nSetup:\n1. Set `base_url` variable to your local URL\n2. Register a user, then login to get the token\n3. Set `auth_token` variable with the token from login response",
+    "_postman_id": "jobtrack-api-collection-2026",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost/jobtracker/public/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"phone\": \"9876543210\",\n  \"gender\": 1,\n  \"password\": \"password123\",\n  \"role\": 2\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] },
+            "description": "Register a new user. role: 1=System Admin, 2=Principal, 3=Vendor. gender: 1=Male, 2=Female, 3=Other."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.data && json.data.access_token) {",
+                  "  pm.collectionVariables.set('auth_token', json.data.access_token);",
+                  "  console.log('Token saved:', json.data.access_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] },
+            "description": "Login and automatically saves access_token to collection variable."
+          }
+        },
+        {
+          "name": "Me (Profile)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/me", "host": ["{{base_url}}"], "path": ["me"] }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"password123\",\n  \"new_password\": \"newpassword123\",\n  \"new_password_confirmation\": \"newpassword123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/change-password", "host": ["{{base_url}}"], "path": ["change-password"] }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/logout", "host": ["{{base_url}}"], "path": ["logout"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏢 Workspaces",
+      "item": [
+        {
+          "name": "Create Workspace",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Coimbatore Machining Works\",\n  \"gstin\": \"33AABCU9603R1ZX\",\n  \"address\": \"123 Industrial Estate\",\n  \"city\": \"Coimbatore\",\n  \"state\": \"Tamil Nadu\",\n  \"pincode\": \"641001\",\n  \"phone\": \"0422-1234567\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/workspaces/create", "host": ["{{base_url}}"], "path": ["workspaces", "create"] }
+          }
+        },
+        {
+          "name": "List Workspaces",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/workspaces/list", "host": ["{{base_url}}"], "path": ["workspaces", "list"] }
+          }
+        },
+        {
+          "name": "Workspace Details",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/workspaces/details", "host": ["{{base_url}}"], "path": ["workspaces", "details"] }
+          }
+        },
+        {
+          "name": "Update Workspace",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1,\n  \"name\": \"Updated Workshop Name\",\n  \"phone\": \"9999999999\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/workspaces/update", "host": ["{{base_url}}"], "path": ["workspaces", "update"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👥 Vendors",
+      "item": [
+        {
+          "name": "Create Vendor",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspace_id\": 1,\n  \"shop_name\": \"Sri Lakshmi Welding Works\",\n  \"contact_person\": \"Rajan Kumar\",\n  \"phone\": \"9876543210\",\n  \"whatsapp_number\": \"9876543210\",\n  \"email\": \"rajan@welding.com\",\n  \"gstin\": \"33AABCU9603R1ZX\",\n  \"address\": \"45 SIDCO Estate\",\n  \"city\": \"Coimbatore\",\n  \"pincode\": \"641021\",\n  \"preferred_language\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/vendors/create", "host": ["{{base_url}}"], "path": ["vendors", "create"] },
+            "description": "preferred_language: 1=English, 2=Tamil"
+          }
+        },
+        {
+          "name": "List Vendors",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspace_id\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/vendors/list", "host": ["{{base_url}}"], "path": ["vendors", "list"] }
+          }
+        },
+        {
+          "name": "Vendor Details",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/vendors/details", "host": ["{{base_url}}"], "path": ["vendors", "details"] }
+          }
+        },
+        {
+          "name": "Update Vendor",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1,\n  \"shop_name\": \"Updated Shop Name\",\n  \"phone\": \"9123456789\",\n  \"status\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/vendors/update", "host": ["{{base_url}}"], "path": ["vendors", "update"] },
+            "description": "status: 1=Active, 2=Inactive, 3=Suspended"
+          }
+        }
+      ]
+    },
+    {
+      "name": "📋 Job Orders",
+      "item": [
+        {
+          "name": "Create Job Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspace_id\": 1,\n  \"vendor_id\": 1,\n  \"part_name\": \"Camshaft Housing\",\n  \"part_number\": \"CSH-2026-001\",\n  \"description\": \"CNC machining for camshaft housing\",\n  \"process_type\": \"CNC Machining\",\n  \"quantity_sent\": 50,\n  \"uom\": \"Nos\",\n  \"due_date\": \"2026-07-20\",\n  \"status\": 2,\n  \"priority\": 3,\n  \"notes\": \"Urgent - Ashok Leyland supply\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/job-orders/create", "host": ["{{base_url}}"], "path": ["job-orders", "create"] },
+            "description": "status: 1=Draft, 2=Material Out. priority: 1=Low, 2=Normal, 3=High, 4=Urgent."
+          }
+        },
+        {
+          "name": "List Job Orders",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspace_id\": 1,\n  \"status\": null,\n  \"vendor_id\": null,\n  \"priority\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/job-orders/list", "host": ["{{base_url}}"], "path": ["job-orders", "list"] },
+            "description": "All filter params are optional. status: 1=Draft, 2=Material Out, 3=WIP, 4=Ready, 5=Dispatched Back, 6=Completed, 7=Cancelled."
+          }
+        },
+        {
+          "name": "Job Order Details",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/job-orders/details", "host": ["{{base_url}}"], "path": ["job-orders", "details"] }
+          }
+        },
+        {
+          "name": "Update Job Order Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1,\n  \"status\": 3,\n  \"changed_via\": 1,\n  \"notes\": \"Started machining\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/job-orders/update-status", "host": ["{{base_url}}"], "path": ["job-orders", "update-status"] },
+            "description": "status: 1=Draft, 2=Material Out, 3=WIP, 4=Ready, 5=Dispatched Back, 6=Completed, 7=Cancelled.\nchanged_via: 1=Web, 2=PWA, 3=WhatsApp Bot, 4=QR Scan.\nVendors (role 3) can only set: 3=WIP, 4=Ready, 5=Dispatched Back."
+          }
+        }
+      ]
+    },
+    {
+      "name": "📄 Delivery Challans",
+      "item": [
+        {
+          "name": "Create Challan",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspace_id\": 1,\n  \"job_order_id\": 1,\n  \"vendor_id\": 1,\n  \"type\": 1,\n  \"dispatch_date\": \"2026-07-05\",\n  \"estimated_delivery\": \"2026-07-06\",\n  \"vehicle_number\": \"TN 38 AB 1234\",\n  \"driver_name\": \"Murugan\",\n  \"notes\": \"Handle with care\",\n  \"items\": [\n    {\n      \"part_name\": \"Camshaft Housing Blank\",\n      \"part_number\": \"CSH-2026-001\",\n      \"hsn_code\": \"8483\",\n      \"quantity\": 50,\n      \"uom\": \"Nos\",\n      \"unit_value\": 250.00,\n      \"description\": \"Raw casting for machining\"\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/challans/create", "host": ["{{base_url}}"], "path": ["challans", "create"] },
+            "description": "type: 1=Outward (Principal→Vendor), 2=Inward (Vendor→Principal). Free plan limit: 50 DCs/month."
+          }
+        },
+        {
+          "name": "List Challans",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspace_id\": 1,\n  \"status\": null,\n  \"vendor_id\": null,\n  \"type\": null,\n  \"job_order_id\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/challans/list", "host": ["{{base_url}}"], "path": ["challans", "list"] },
+            "description": "status: 1=Issued, 2=Dispatched, 3=Acknowledged, 4=Completed, 5=Cancelled"
+          }
+        },
+        {
+          "name": "Challan Details",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/challans/details", "host": ["{{base_url}}"], "path": ["challans", "details"] }
+          }
+        },
+        {
+          "name": "Acknowledge Challan (Vendor)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1,\n  \"notes\": \"Received 50 pieces in good condition\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/challans/acknowledge", "host": ["{{base_url}}"], "path": ["challans", "acknowledge"] }
+          }
+        },
+        {
+          "name": "Cancel Challan",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1,\n  \"reason\": \"Order changed - wrong vendor selected\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/challans/cancel", "host": ["{{base_url}}"], "path": ["challans", "cancel"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔴 Quality Rejections",
+      "item": [
+        {
+          "name": "Report Rejection",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job_order_id\": 1,\n  \"rejected_qty\": 5,\n  \"accepted_qty\": 45,\n  \"rejection_type\": 1,\n  \"rejection_reason\": \"Surface finish not meeting Ra 1.6 specification\",\n  \"photo_path\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/rejections/create", "host": ["{{base_url}}"], "path": ["rejections", "create"] },
+            "description": "rejection_type: 1=Scrap, 2=Rework, 3=Short Supply"
+          }
+        },
+        {
+          "name": "List Rejections",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspace_id\": 1,\n  \"status\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/rejections/list", "host": ["{{base_url}}"], "path": ["rejections", "list"] },
+            "description": "status: 1=Open, 2=Acknowledged, 3=Rework Dispatched, 4=Closed"
+          }
+        },
+        {
+          "name": "Rejection Details",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/rejections/details", "host": ["{{base_url}}"], "path": ["rejections", "details"] }
+          }
+        },
+        {
+          "name": "Acknowledge Rejection (Vendor)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/rejections/acknowledge", "host": ["{{base_url}}"], "path": ["rejections", "acknowledge"] }
+          }
+        },
+        {
+          "name": "Close Rejection",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/rejections/close", "host": ["{{base_url}}"], "path": ["rejections", "close"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "⚖️ Material Reconciliations",
+      "item": [
+        {
+          "name": "Create Reconciliation",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job_order_id\": 1,\n  \"qty_finished_received\": 45,\n  \"qty_scrap\": 3,\n  \"qty_rejected\": 2,\n  \"remarks\": \"ITC-04 reconciliation for July 2026 batch\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/reconciliations/create", "host": ["{{base_url}}"], "path": ["reconciliations", "create"] },
+            "description": "Qty balance formula: qty_dispatched (from JO) = qty_finished_received + qty_scrap + qty_rejected + qty_shortage. If balanced (shortage=0), Job Order is auto-marked Completed."
+          }
+        },
+        {
+          "name": "List Reconciliations",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspace_id\": 1,\n  \"is_balanced\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/reconciliations/list", "host": ["{{base_url}}"], "path": ["reconciliations", "list"] },
+            "description": "is_balanced: 0=Unbalanced, 1=Balanced"
+          }
+        },
+        {
+          "name": "Reconciliation Details",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/reconciliations/details", "host": ["{{base_url}}"], "path": ["reconciliations", "details"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "💳 Subscriptions",
+      "item": [
+        {
+          "name": "Subscription Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspace_id\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/subscriptions/status", "host": ["{{base_url}}"], "path": ["subscriptions", "status"] }
+          }
+        },
+        {
+          "name": "Upgrade Plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspace_id\": 1,\n  \"plan\": 2\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/subscriptions/upgrade", "host": ["{{base_url}}"], "path": ["subscriptions", "upgrade"] },
+            "description": "plan: 2=Factory (₹1,999/month), 3=Industrial (₹4,999/month). Only workspace owner can upgrade."
+          }
+        },
+        {
+          "name": "Billing Invoices",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspace_id\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/subscriptions/invoices", "host": ["{{base_url}}"], "path": ["subscriptions", "invoices"] }
+          }
+        },
+        {
+          "name": "Razorpay Webhook (Public)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"subscription.charged\",\n  \"payload\": {\n    \"subscription\": {\n      \"entity\": {\n        \"id\": \"sub_XXXXXXXXXXXXXXXX\",\n        \"plan_amount\": 199900,\n        \"current_start\": 1751500800,\n        \"current_end\": 1754092800\n      }\n    },\n    \"payment\": {\n      \"entity\": {\n        \"id\": \"pay_XXXXXXXXXXXXXXXX\"\n      }\n    }\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/subscriptions/webhook", "host": ["{{base_url}}"], "path": ["subscriptions", "webhook"] },
+            "description": "Public endpoint. Events handled: subscription.charged, subscription.cancelled, subscription.halted."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔔 Notifications",
+      "item": [
+        {
+          "name": "List Notification Logs",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspace_id\": 1,\n  \"channel\": null,\n  \"status\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/notifications/list", "host": ["{{base_url}}"], "path": ["notifications", "list"] },
+            "description": "channel: 1=WhatsApp, 2=SMS, 3=Email, 4=Push. status: 1=Pending, 2=Sent, 3=Failed, 4=Delivered."
+          }
+        },
+        {
+          "name": "Send Test Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspace_id\": 1,\n  \"channel\": 1,\n  \"message\": \"Test alert from JobTrack system\",\n  \"recipient\": \"9876543210\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/notifications/send-test", "host": ["{{base_url}}"], "path": ["notifications", "send-test"] },
+            "description": "channel: 1=WhatsApp, 2=SMS → use phone number in recipient. 3=Email → use email address in recipient."
+          }
+        }
+      ]
+    },
+    {
+      "name": "📱 WhatsApp Bot",
+      "item": [
+        {
+          "name": "Inbound Webhook (Public)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"9876543210\",\n  \"to\": \"9000000000\",\n  \"message\": \"WIP JO-2026-00001\",\n  \"message_id\": \"wamid.XXXXXXXXXXXXXXXXXXXXXXXX\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/whatsapp/webhook", "host": ["{{base_url}}"], "path": ["whatsapp", "webhook"] },
+            "description": "Public endpoint. Vendors send text messages to update job order status.\n\nSupported formats:\n- WIP JO-2026-00001\n- READY JO-2026-00001\n- DISPATCHED JO-2026-00001\n- JO-2026-00001 WIP\n\nThe 'from' number must match a vendor's phone/whatsapp_number in the system."
+          }
+        },
+        {
+          "name": "WhatsApp Bot Logs",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workspace_id\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/whatsapp/logs", "host": ["{{base_url}}"], "path": ["whatsapp", "logs"] }
+          }
+        }
+      ]
+    }
+  ]
+}
