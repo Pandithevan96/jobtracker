@@ -54,26 +54,24 @@ class AuthController extends Controller
 
             $token = $user->createToken('auth_token')->plainTextToken;
 
-            return HelperFunction::response(
-                [
+            return response()->json([
+                'status'    => 'success',
+                'message'   => 'User registered successfully',
+                'code'      => '000',
+                'data'      => [
                     'user'         => $user->toArray(),
                     'access_token' => $token,
                 ],
-                null,
-                'User registered successfully',
-                'success',
-                '000',
-                Response::HTTP_OK
-            );
+                'mac'       => null,
+                'timestamp' => now()->toIso8601String(),
+            ], 201);
         } catch (\Throwable $e) {
-            return HelperFunction::response(
-                null,
-                $e->getFile() . ':' . $e->getLine(),
-                $e->getMessage(),
-                'error',
-                '500',
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+            return response()->json([
+                'status'  => 'error',
+                'message' => $e->getMessage(),
+                'file'    => $e->getFile() . ':' . $e->getLine(),
+                'code'    => '500',
+            ], 500);
         }
     }
 
@@ -136,18 +134,18 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return HelperFunction::response(
-            [
+        return response()->json([
+            'status'    => 'success',
+            'message'   => 'Login successful',
+            'code'      => '000',
+            'data'      => [
                 'user'                   => $user->toArray(),
                 'access_token'           => $token,
                 'password_change_required' => $user->isPasswordUnchanged(),
             ],
-            null,
-            'Login successful',
-            'success',
-            '000',
-            Response::HTTP_OK
-        );
+            'mac'       => null,
+            'timestamp' => now()->toIso8601String(),
+        ], 200);
     }
 
     /**
