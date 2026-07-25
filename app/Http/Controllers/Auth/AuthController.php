@@ -56,7 +56,7 @@ class AuthController extends Controller
                 $token = $user->createToken('auth_token')->plainTextToken;
 
                 return [
-                    'user'         => $user->fresh()->toArray(),
+                    'user'         => $user->toArray(),
                     'access_token' => $token,
                 ];
             });
@@ -144,7 +144,7 @@ class AuthController extends Controller
                 'message'   => 'Login successful',
                 'code'      => '000',
                 'data'      => [
-                    'user'                     => $user->fresh()->toArray(),
+                    'user'                     => $user->toArray(),
                     'access_token'             => $token,
                     'password_change_required' => $user->isPasswordUnchanged(),
                 ],
