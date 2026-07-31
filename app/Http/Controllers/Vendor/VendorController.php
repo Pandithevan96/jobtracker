@@ -12,41 +12,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
-/**
- * --------------------------------------------------------------------------------
- * Vendor Controller
- * --------------------------------------------------------------------------------
- * Manages vendor lifecycle within a workspace: create, list, details, update.
- * Permissions are enforced via HelperFunction::rolePermission(MODULE_ID).
- * Workspace scoping is enforced by checking workspace_id ownership/membership.
- *
- * @package App\Http\Controllers\Vendor
- * @author  Development Team
- * @version 1.0.0
- * @since   2026-07-03
- * --------------------------------------------------------------------------------
- */
 class VendorController extends Controller
 {
-    /**
-     * Module ID for Vendor Management (from module seeder, id = 3).
-     */
     const MODULE_ID = 3;
 
-    /**
-     * --------------------------------------------------------------------------------
-     * Create a new vendor in a workspace.
-     * POST /api/v1/vendors/create
-     * --------------------------------------------------------------------------------
-     * @param  Request $request  workspace_id*, shop_name*, phone*, contact_person, whatsapp_number,
-     *                           email, gstin, address, city, pincode, preferred_language
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
-     */
     public function store(Request $request)
     {
         try {
-            // Check permission
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
             if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_create) {
                 return HelperFunction::response(null, null, 'You do not have permission to create vendors', 'error', '005', Response::HTTP_FORBIDDEN);
@@ -63,7 +35,7 @@ class VendorController extends Controller
                 'address'            => 'nullable|string|max:255',
                 'city'               => 'nullable|string|max:100',
                 'pincode'            => 'nullable|string|max:10',
-                'preferred_language' => 'nullable|integer|in:1,2', // 1-English, 2-Tamil
+                'preferred_language' => 'nullable|integer|in:1,2',
             ]);
 
             if ($validation->fails()) {
@@ -73,7 +45,6 @@ class VendorController extends Controller
             $user = Auth::user();
             $workspaceId = $request->input('workspace_id');
 
-            // Workspace scope: confirm user belongs to this workspace
             $workspace = Workspace::where('id', $workspaceId)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
@@ -85,7 +56,6 @@ class VendorController extends Controller
                 return HelperFunction::response(null, null, 'Workspace not found or you do not belong to it', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
-            // Plan constraint: Free plan max 10 vendors, Factory plan max 20 vendors
             $currentCount = Vendor::where('workspace_id', $workspaceId)->count();
             if ($workspace->plan === Workspace::PLAN_FREE && $currentCount >= 10) {
                 return HelperFunction::response(null, null, 'Free plan is limited to 10 vendors. Please upgrade.', 'error', '004', Response::HTTP_FORBIDDEN);
@@ -115,19 +85,9 @@ class VendorController extends Controller
         }
     }
 
-    /**
-     * --------------------------------------------------------------------------------
-     * List vendors under a workspace.
-     * POST /api/v1/vendors/list
-     * --------------------------------------------------------------------------------
-     * @param  Request $request  workspace_id*
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
-     */
     public function list(Request $request)
     {
         try {
-            // Check permission
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
             if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_view) {
                 return HelperFunction::response(null, null, 'You do not have permission to view vendors', 'error', '005', Response::HTTP_FORBIDDEN);
@@ -144,7 +104,6 @@ class VendorController extends Controller
             $user = Auth::user();
             $workspaceId = $request->input('workspace_id');
 
-            // Workspace scope check
             $workspace = Workspace::where('id', $workspaceId)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
@@ -166,19 +125,9 @@ class VendorController extends Controller
         }
     }
 
-    /**
-     * --------------------------------------------------------------------------------
-     * Get details for a specific vendor.
-     * POST /api/v1/vendors/details
-     * --------------------------------------------------------------------------------
-     * @param  Request $request  id*
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
-     */
     public function details(Request $request)
     {
         try {
-            // Check permission
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
             if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_view) {
                 return HelperFunction::response(null, null, 'You do not have permission to view vendor details', 'error', '005', Response::HTTP_FORBIDDEN);
@@ -195,7 +144,6 @@ class VendorController extends Controller
             $user = Auth::user();
             $vendor = Vendor::find($request->input('id'));
 
-            // Workspace scope check
             $workspace = Workspace::where('id', $vendor->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
@@ -213,20 +161,9 @@ class VendorController extends Controller
         }
     }
 
-    /**
-     * --------------------------------------------------------------------------------
-     * Update an existing vendor.
-     * POST /api/v1/vendors/update
-     * --------------------------------------------------------------------------------
-     * @param  Request $request  id*, shop_name, contact_person, phone, whatsapp_number,
-     *                           email, gstin, address, city, pincode, preferred_language, status
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
-     */
     public function update(Request $request)
     {
         try {
-            // Check permission
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
             if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_edit) {
                 return HelperFunction::response(null, null, 'You do not have permission to update vendors', 'error', '005', Response::HTTP_FORBIDDEN);
@@ -244,7 +181,7 @@ class VendorController extends Controller
                 'city'               => 'nullable|string|max:100',
                 'pincode'            => 'nullable|string|max:10',
                 'preferred_language' => 'nullable|integer|in:1,2',
-                'status'             => 'nullable|integer|in:1,2,3', // 1-Active, 2-Inactive, 3-Suspended
+                'status'             => 'nullable|integer|in:1,2,3',
             ]);
 
             if ($validation->fails()) {
@@ -254,7 +191,6 @@ class VendorController extends Controller
             $user = Auth::user();
             $vendor = Vendor::find($request->input('id'));
 
-            // Workspace scope check
             $workspace = Workspace::where('id', $vendor->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
@@ -287,11 +223,12 @@ class VendorController extends Controller
             return HelperFunction::response(null, null, 'Failed to update vendor: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
     /**
      * --------------------------------------------------------------------------------
      * Link an existing registered user account to a vendor record, and grant
-     * them workspace membership with role = 2 (Vendor) so they can log in
-     * and see job orders assigned to them.
+     * them workspace membership with role = Vendor so they can log in and
+     * see job orders assigned to them.
      * POST /api/v1/vendors/link-user
      * --------------------------------------------------------------------------------
      * @param  Request $request  vendor_id*, email_or_phone*
@@ -352,7 +289,9 @@ class VendorController extends Controller
                 ],
             ]);
 
-            $vendor->update(['linked_user_id' => $targetUser->id]);
+            // Use the vendor table's existing user_id column (already
+            // fillable on the Vendor model) rather than a new column.
+            $vendor->update(['user_id' => $targetUser->id]);
 
             return HelperFunction::response($vendor->fresh(), null, 'Vendor linked to user account successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
