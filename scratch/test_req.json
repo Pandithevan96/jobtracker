@@ -1,0 +1,9 @@
+{
+  "name": "SSL CA Bundle User",
+  "email": "ssl_ca_bundle_fixed_100@gmail.com",
+  "phone": "9876543210",
+  "password": "Test@1234",
+  "password_confirmation": "Test@1234",
+  "gender": 1,
+  "role": 2
+}

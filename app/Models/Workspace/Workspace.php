@@ -19,6 +19,17 @@ class Workspace extends Model
     const STATUS_SUSPENDED = 2;
     const STATUS_CANCELLED = 3;
 
+    // Workspace membership pivot-role constants (workspace_users table).
+    // NOTE: this is a DIFFERENT scale from User::ROLE_ADMIN/PRINCIPAL/VENDOR
+    // (the user's global account role). Same numbers (1/2/3), different
+    // meanings — always reference these constants for pivot 'role', never
+    // a bare integer, to avoid mixing the two scales up.
+    const MEMBER_ROLE_PRINCIPAL = 1;
+    const MEMBER_ROLE_VENDOR    = 2;
+    const MEMBER_ROLE_ADMIN     = 3;
+
+    const MEMBER_STATUS_ACTIVE = 1;
+
     /**
      * The table associated with the model.
      *

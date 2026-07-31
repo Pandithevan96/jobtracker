@@ -164,4 +164,49 @@ class NotificationService
             Log::error('NotificationService::dispatchChallanAcknowledged failed: ' . $e->getMessage());
         }
     }
+
+    /**
+     * --------------------------------------------------------------------------------
+     * Dispatch a notification when a new Job Order is created and assigned to a vendor.
+     * --------------------------------------------------------------------------------
+     *
+     * @param  JobOrder  $jobOrder   The newly created job order (with vendor loaded).
+     * @param  User      $createdBy  The principal/staff user who created it.
+     * @return void
+     * --------------------------------------------------------------------------------
+     */
+    public static function dispatchJobOrderCreated(JobOrder $jobOrder, User $createdBy): void
+    {
+        try {
+            $jobOrder->loadMissing('vendor');
+            $vendor = $jobOrder->vendor;
+
+            $message = sprintf(
+                '📦 New Job Order %s (%s) has been assigned to %s. Quantity: %s %s. Due: %s. Please log in to JobTrack to view details.',
+                $jobOrder->order_number,
+                $jobOrder->part_name,
+                $vendor?->shop_name ?? 'your shop',
+                $jobOrder->quantity_sent,
+                $jobOrder->uom,
+                optional($jobOrder->due_date)->format('d M Y') ?? $jobOrder->due_date
+            );
+
+            Notification::create([
+                'workspace_id'     => $jobOrder->workspace_id,
+                'job_order_id'     => $jobOrder->id,
+                'vendor_id'        => $vendor?->id,
+                'user_id'          => $createdBy->id,
+                'channel'          => Notification::CHANNEL_WHATSAPP,
+                'type'             => Notification::TYPE_JOB_CREATED,
+                'recipient_number' => $vendor?->whatsapp_number ?? $vendor?->phone ?? null,
+                'recipient_email'  => $vendor?->email ?? null,
+                'message'          => $message,
+                'status'           => Notification::STATUS_PENDING, // Simulated until live API
+                'sent_at'          => now(),
+            ]);
+        } catch (\Throwable $e) {
+            // Notification failures must never break the main business flow
+            Log::error('NotificationService::dispatchJobOrderCreated failed: ' . $e->getMessage());
+        }
+    }
 }

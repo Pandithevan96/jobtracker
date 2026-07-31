@@ -54,6 +54,7 @@ Route::prefix('v1')->group(function () {
             Route::post('list',        'Vendor\VendorController@list');
             Route::post('details',     'Vendor\VendorController@details');
             Route::post('update',      'Vendor\VendorController@update');
+            Route::post('link-user',   'Vendor\VendorController@linkUser');
         });
 
         // Job Order Routes
@@ -111,7 +112,5 @@ Route::prefix('v1')->group(function () {
         Route::prefix('whatsapp')->group(function () {
             Route::post('logs',        'Notification\WhatsappBotController@logs');
         });
-
     });
-
 });

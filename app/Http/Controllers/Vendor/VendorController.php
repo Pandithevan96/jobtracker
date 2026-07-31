@@ -77,7 +77,7 @@ class VendorController extends Controller
             $workspace = Workspace::where('id', $workspaceId)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                      ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
@@ -148,7 +148,7 @@ class VendorController extends Controller
             $workspace = Workspace::where('id', $workspaceId)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                      ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
@@ -199,7 +199,7 @@ class VendorController extends Controller
             $workspace = Workspace::where('id', $vendor->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                      ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
@@ -258,7 +258,7 @@ class VendorController extends Controller
             $workspace = Workspace::where('id', $vendor->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                      ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
@@ -267,16 +267,96 @@ class VendorController extends Controller
             }
 
             $updateData = array_filter($request->only([
-                'shop_name', 'contact_person', 'phone', 'whatsapp_number',
-                'email', 'gstin', 'address', 'city', 'pincode',
-                'preferred_language', 'status',
-            ]), fn ($value) => !is_null($value));
+                'shop_name',
+                'contact_person',
+                'phone',
+                'whatsapp_number',
+                'email',
+                'gstin',
+                'address',
+                'city',
+                'pincode',
+                'preferred_language',
+                'status',
+            ]), fn($value) => !is_null($value));
 
             $vendor->update($updateData);
 
             return HelperFunction::response($vendor->fresh(), null, 'Vendor updated successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
             return HelperFunction::response(null, null, 'Failed to update vendor: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+    /**
+     * --------------------------------------------------------------------------------
+     * Link an existing registered user account to a vendor record, and grant
+     * them workspace membership with role = 2 (Vendor) so they can log in
+     * and see job orders assigned to them.
+     * POST /api/v1/vendors/link-user
+     * --------------------------------------------------------------------------------
+     * @param  Request $request  vendor_id*, email_or_phone*
+     * @return \Illuminate\Http\JsonResponse
+     * --------------------------------------------------------------------------------
+     */
+    public function linkUser(Request $request)
+    {
+        try {
+            $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
+            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_edit) {
+                return HelperFunction::response(null, null, 'You do not have permission to link a vendor user', 'error', '005', Response::HTTP_FORBIDDEN);
+            }
+
+            $validation = Validator::make($request->all(), [
+                'vendor_id'       => 'required|integer|exists:vendors,id',
+                'email_or_phone'  => 'required|string|max:255',
+            ]);
+
+            if ($validation->fails()) {
+                return HelperFunction::response(null, null, $validation->errors()->first(), 'error', '001', Response::HTTP_BAD_REQUEST);
+            }
+
+            $authUser = Auth::user();
+            $vendor = Vendor::find($request->input('vendor_id'));
+
+            // Only the workspace owner/principal can link vendors
+            $workspace = Workspace::where('id', $vendor->workspace_id)
+                ->where('owner_id', $authUser->id)
+                ->first();
+
+            if (!$workspace) {
+                return HelperFunction::response(null, null, 'Only the workspace owner can link a vendor user', 'error', '005', Response::HTTP_FORBIDDEN);
+            }
+
+            $identifier = $request->input('email_or_phone');
+            $targetUser = \App\Models\User\User::where('email', $identifier)
+                ->orWhere('phone', $identifier)
+                ->first();
+
+            if (!$targetUser) {
+                return HelperFunction::response(null, null, 'No registered account found with that email or phone. Ask them to register first, then try again.', 'error', '003', Response::HTTP_NOT_FOUND);
+            }
+
+            if ($targetUser->id === $authUser->id) {
+                return HelperFunction::response(null, null, 'You cannot link yourself as a vendor', 'error', '001', Response::HTTP_BAD_REQUEST);
+            }
+
+            // Attach (or update) workspace membership as a Vendor.
+            // NOTE: Workspace::MEMBER_ROLE_VENDOR (pivot scale) is distinct
+            // from User::ROLE_VENDOR (global account-role scale) — they use
+            // the same 1/2/3 values for different things, so always go
+            // through the named constant here, never a bare integer.
+            $workspace->members()->syncWithoutDetaching([
+                $targetUser->id => [
+                    'role'   => Workspace::MEMBER_ROLE_VENDOR,
+                    'status' => Workspace::MEMBER_STATUS_ACTIVE,
+                ],
+            ]);
+
+            $vendor->update(['linked_user_id' => $targetUser->id]);
+
+            return HelperFunction::response($vendor->fresh(), null, 'Vendor linked to user account successfully', 'success', '000', Response::HTTP_OK);
+        } catch (Exception $e) {
+            return HelperFunction::response(null, null, 'Failed to link vendor user: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

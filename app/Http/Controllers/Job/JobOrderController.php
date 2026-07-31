@@ -17,41 +17,13 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
-/**
- * --------------------------------------------------------------------------------
- * Job Order Controller
- * --------------------------------------------------------------------------------
- * Manages job orders lifecycle: create, list, details, update-status.
- * Permissions are enforced via HelperFunction::rolePermission(MODULE_ID).
- * Vendor role users can only transition status to WIP / Ready / Dispatched Back.
- *
- * @package App\Http\Controllers\Job
- * @author  Development Team
- * @version 1.0.0
- * @since   2026-07-03
- * --------------------------------------------------------------------------------
- */
 class JobOrderController extends Controller
 {
-    /**
-     * Module ID for Job Order Management (from module seeder, id = 4).
-     */
     const MODULE_ID = 4;
 
-    /**
-     * --------------------------------------------------------------------------------
-     * Create a new job order.
-     * POST /api/v1/job-orders/create
-     * --------------------------------------------------------------------------------
-     * @param  Request $request  workspace_id*, vendor_id*, part_name*, quantity_sent*, due_date*,
-     *                           part_number, description, process_type, uom, status, priority, notes
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
-     */
     public function store(Request $request)
     {
         try {
-            // Check permission
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
             if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_create) {
                 return HelperFunction::response(null, null, 'You do not have permission to create job orders', 'error', '005', Response::HTTP_FORBIDDEN);
@@ -67,8 +39,8 @@ class JobOrderController extends Controller
                 'quantity_sent' => 'required|numeric|min:0.01',
                 'uom'           => 'nullable|string|max:20',
                 'due_date'      => 'required|date|after_or_equal:today',
-                'status'        => 'nullable|integer|in:1,2', // 1-Draft, 2-Material Out
-                'priority'      => 'nullable|integer|in:1,2,3,4', // 1-Low, 2-Normal, 3-High, 4-Urgent
+                'status'        => 'nullable|integer|in:1,2',
+                'priority'      => 'nullable|integer|in:1,2,3,4',
                 'notes'         => 'nullable|string',
             ]);
 
@@ -79,9 +51,8 @@ class JobOrderController extends Controller
             $user = Auth::user();
             $workspaceId = $request->input('workspace_id');
 
-            // Workspace scope: confirm user belongs to workspace
             $workspace = Workspace::where('id', $workspaceId)
-                ->where(function ($q) use ($user) {
+                ->where(function ($q) use ($user) { 
                     $q->where('owner_id', $user->id)
                         ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
                 })
@@ -91,7 +62,6 @@ class JobOrderController extends Controller
                 return HelperFunction::response(null, null, 'Workspace not found or you do not belong to it', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
-            // Verify vendor belongs to this workspace
             $vendor = Vendor::where('id', $request->input('vendor_id'))
                 ->where('workspace_id', $workspaceId)
                 ->first();
@@ -118,7 +88,6 @@ class JobOrderController extends Controller
                 'notes'         => $request->input('notes'),
             ]);
 
-            // Create initial audit log entry
             JobOrderStatusLog::create([
                 'job_order_id' => $jobOrder->id,
                 'changed_by'   => $user->id,
@@ -128,25 +97,18 @@ class JobOrderController extends Controller
                 'notes'        => 'Job Order created.',
             ]);
 
+            // Notify the assigned vendor that a new job order has been created
+            NotificationService::dispatchJobOrderCreated($jobOrder->fresh(['vendor']), $user);
+
             return HelperFunction::response($jobOrder, null, 'Job Order created successfully', 'success', '000', Response::HTTP_CREATED);
         } catch (Exception $e) {
             return HelperFunction::response(null, null, 'Failed to create job order: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
-    /**
-     * --------------------------------------------------------------------------------
-     * List job orders in a workspace.
-     * POST /api/v1/job-orders/list
-     * --------------------------------------------------------------------------------
-     * @param  Request $request  workspace_id*, status, vendor_id, priority
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
-     */
     public function list(Request $request)
     {
         try {
-            // Check permission
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
             if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_view) {
                 return HelperFunction::response(null, null, 'You do not have permission to view job orders', 'error', '005', Response::HTTP_FORBIDDEN);
@@ -166,7 +128,6 @@ class JobOrderController extends Controller
             $user = Auth::user();
             $workspaceId = $request->input('workspace_id');
 
-            // Workspace scope check
             $workspace = Workspace::where('id', $workspaceId)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
@@ -199,19 +160,9 @@ class JobOrderController extends Controller
         }
     }
 
-    /**
-     * --------------------------------------------------------------------------------
-     * Get details of a specific job order.
-     * POST /api/v1/job-orders/details
-     * --------------------------------------------------------------------------------
-     * @param  Request $request  id*
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
-     */
     public function details(Request $request)
     {
         try {
-            // Check permission
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
             if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_view) {
                 return HelperFunction::response(null, null, 'You do not have permission to view job order details', 'error', '005', Response::HTTP_FORBIDDEN);
@@ -228,7 +179,6 @@ class JobOrderController extends Controller
             $user = Auth::user();
             $jobOrder = JobOrder::with(['vendor', 'creator', 'statusLogs.changedBy', 'orderNotes.user'])->find($request->input('id'));
 
-            // Workspace scope check
             $workspace = Workspace::where('id', $jobOrder->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
@@ -246,22 +196,9 @@ class JobOrderController extends Controller
         }
     }
 
-    /**
-     * --------------------------------------------------------------------------------
-     * Update the status of a job order.
-     * POST /api/v1/job-orders/update-status
-     * --------------------------------------------------------------------------------
-     * Vendors (role_id = 3) can only transition to WIP (3), Ready (4), Dispatched Back (5).
-     * Principals / System Admins can set any valid status.
-     *
-     * @param  Request $request  id*, status*, changed_via, photo_proof_path, notes
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
-     */
     public function updateStatus(Request $request)
     {
         try {
-            // Check permission
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
             if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_edit) {
                 return HelperFunction::response(null, null, 'You do not have permission to update job order status', 'error', '005', Response::HTTP_FORBIDDEN);
@@ -270,7 +207,7 @@ class JobOrderController extends Controller
             $validation = Validator::make($request->all(), [
                 'id'               => 'required|integer|exists:job_orders,id',
                 'status'           => 'required|integer|in:1,2,3,4,5,6,7',
-                'changed_via'      => 'nullable|integer|in:1,2,3,4', // 1-Web, 2-PWA, 3-WhatsApp Bot, 4-QR Scan
+                'changed_via'      => 'nullable|integer|in:1,2,3,4',
                 'photo_proof_path' => 'nullable|string',
                 'notes'            => 'nullable|string',
             ]);
@@ -283,7 +220,6 @@ class JobOrderController extends Controller
             $newStatus = (int) $request->input('status');
             $jobOrder = JobOrder::find($request->input('id'));
 
-            // Workspace scope check
             $workspace = Workspace::where('id', $jobOrder->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
@@ -295,7 +231,6 @@ class JobOrderController extends Controller
                 return HelperFunction::response(null, null, 'You do not have access to this job order', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
-            // Vendor role restriction: can only set WIP, Ready, or Dispatched Back
             if ($user->isVendor() && !in_array($newStatus, [
                 JobOrder::STATUS_WIP,
                 JobOrder::STATUS_READY,
@@ -318,7 +253,6 @@ class JobOrderController extends Controller
                 'notes'            => $request->input('notes'),
             ]);
 
-            // Dispatch status-change notification (simulated; no live API yet)
             NotificationService::dispatchJobStatusChange(
                 $jobOrder->fresh(['vendor']),
                 $oldStatus,
@@ -332,15 +266,6 @@ class JobOrderController extends Controller
         }
     }
 
-    /**
-     * --------------------------------------------------------------------------------
-     * Upload a workpiece drawing / document for a job order.
-     * POST /api/v1/job-orders/upload-document
-     * --------------------------------------------------------------------------------
-     * @param  Request $request  id*, file* (jpg/png/pdf max 10MB)
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
-     */
     public function uploadDocument(Request $request)
     {
         try {
@@ -361,11 +286,10 @@ class JobOrderController extends Controller
             $user     = Auth::user();
             $jobOrder = JobOrder::find($request->input('id'));
 
-            // Workspace scope check
             $workspace = Workspace::where('id', $jobOrder->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                      ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
@@ -374,14 +298,13 @@ class JobOrderController extends Controller
             }
 
             $path = $request->file('file')->store('job_documents', 'public');
-            $url  = Storage::url($path);  // e.g. /storage/job_documents/xxx.pdf
+            $url  = Storage::url($path);
 
-            // Merge into the existing array
             $existing = $jobOrder->drawing_urls ?? [];
             $existing[] = [
                 'path'         => $path,
                 'url'          => $url,
-                'original_name'=> $request->file('file')->getClientOriginalName(),
+                'original_name' => $request->file('file')->getClientOriginalName(),
                 'uploaded_by'  => $user->id,
                 'uploaded_at'  => now()->toISOString(),
             ];
@@ -391,22 +314,15 @@ class JobOrderController extends Controller
                 ['url' => $url, 'path' => $path, 'original_name' => $request->file('file')->getClientOriginalName()],
                 null,
                 'Document uploaded successfully',
-                'success', '000', Response::HTTP_CREATED
+                'success',
+                '000',
+                Response::HTTP_CREATED
             );
         } catch (Exception $e) {
             return HelperFunction::response(null, null, 'Failed to upload document: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
-    /**
-     * --------------------------------------------------------------------------------
-     * Add a note/remark to a job order (principal ↔ vendor thread).
-     * POST /api/v1/job-orders/add-note
-     * --------------------------------------------------------------------------------
-     * @param  Request $request  id*, note*
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
-     */
     public function addNote(Request $request)
     {
         try {
@@ -427,11 +343,10 @@ class JobOrderController extends Controller
             $user     = Auth::user();
             $jobOrder = JobOrder::find($request->input('id'));
 
-            // Workspace scope
             $workspace = Workspace::where('id', $jobOrder->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                      ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
@@ -454,15 +369,6 @@ class JobOrderController extends Controller
         }
     }
 
-    /**
-     * --------------------------------------------------------------------------------
-     * Get all notes for a job order.
-     * POST /api/v1/job-orders/notes
-     * --------------------------------------------------------------------------------
-     * @param  Request $request  id*
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
-     */
     public function getNotes(Request $request)
     {
         try {
@@ -485,7 +391,7 @@ class JobOrderController extends Controller
             $workspace = Workspace::where('id', $jobOrder->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                      ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
