@@ -252,7 +252,14 @@ class JobOrderController extends Controller
                 return HelperFunction::response(null, null, 'You do not have access to this job order', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
-            if ($user->isVendor() && !in_array($newStatus, [
+            $isVendorOfThisWorkspace =
+                $workspace->owner_id !== $user->id
+                && $workspace->members()
+                    ->where('users.id', $user->id)
+                    ->wherePivot('role', Workspace::MEMBER_ROLE_VENDOR)
+                    ->exists();
+
+            if ($isVendorOfThisWorkspace && !in_array($newStatus, [
                 JobOrder::STATUS_WIP,
                 JobOrder::STATUS_READY,
                 JobOrder::STATUS_DISPATCHED_BACK,

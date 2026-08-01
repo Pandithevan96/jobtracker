@@ -69,14 +69,18 @@ interface JobOrder {
   orderNotes: OrderNote[];
 }
 
-// ─── Status helpers ──────────────────────────────────────────────────────────
+// ─── Status helpers (matching backend JobOrder constants) ───────────────────
+// 1 = Draft, 2 = Material Out (In Progress), 3 = WIP (In Progress),
+// 4 = Ready, 5 = Dispatched Back, 6 = Completed, 7 = Cancelled
 
 const STATUS_MAP: Record<number, { label: string; color: string }> = {
-  1: { label: 'Draft',       color: 'bg-[#333]/40 text-[#aaa] border-[#444]' },
-  2: { label: 'In Progress', color: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
-  3: { label: 'Completed',   color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
-  4: { label: 'Cancelled',   color: 'bg-rose-500/15 text-rose-400 border-rose-500/30' },
-  5: { label: 'Pending',     color: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
+  1: { label: 'Draft',             color: 'bg-[#333]/40 text-[#aaa] border-[#444]' },
+  2: { label: 'In Progress',       color: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
+  3: { label: 'In Progress (WIP)', color: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
+  4: { label: 'Ready for Pickup',   color: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
+  5: { label: 'Dispatched Back',   color: 'bg-purple-500/15 text-purple-400 border-purple-500/30' },
+  6: { label: 'Completed',         color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
+  7: { label: 'Cancelled',         color: 'bg-rose-500/15 text-rose-400 border-rose-500/30' },
 };
 
 function statusInfo(s: number) {
@@ -174,8 +178,8 @@ export const JobOrderDetail: React.FC = () => {
   }
 
   const { label: statusLabel, color: statusColor } = statusInfo(order.status);
-  const isCompleted  = order.status === 3;
-  const isCancelled  = order.status === 4;
+  const isCompleted  = order.status === 6;
+  const isCancelled  = order.status === 7;
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -226,25 +230,61 @@ export const JobOrderDetail: React.FC = () => {
 
         {/* Action buttons */}
         <div className="flex items-center gap-2 flex-wrap">
-          {!isCompleted && !isCancelled && (
-            <button
-              onClick={() => handleUpdateStatus(3)}
-              disabled={updating}
-              className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-black font-bold text-xs px-4 py-2.5 rounded-xl border-none cursor-pointer flex items-center gap-1.5 transition-colors"
-            >
-              {updating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={16} />}
-              Mark Completed
-            </button>
+          {/* Vendor status actions */}
+          {appMode === 'vendor' && !isCompleted && !isCancelled && (
+            <>
+              {order.status === 2 && (
+                <button
+                  onClick={() => handleUpdateStatus(3)}
+                  disabled={updating}
+                  className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black font-bold text-xs px-4 py-2.5 rounded-xl border-none cursor-pointer flex items-center gap-1.5 transition-colors"
+                >
+                  {updating ? <Loader2 size={14} className="animate-spin" /> : null}
+                  Start Production (WIP)
+                </button>
+              )}
+              {order.status === 3 && (
+                <button
+                  onClick={() => handleUpdateStatus(4)}
+                  disabled={updating}
+                  className="bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold text-xs px-4 py-2.5 rounded-xl border-none cursor-pointer flex items-center gap-1.5 transition-colors"
+                >
+                  {updating ? <Loader2 size={14} className="animate-spin" /> : null}
+                  Mark Ready for Pickup
+                </button>
+              )}
+              {order.status === 4 && (
+                <button
+                  onClick={() => handleUpdateStatus(5)}
+                  disabled={updating}
+                  className="bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white font-bold text-xs px-4 py-2.5 rounded-xl border-none cursor-pointer flex items-center gap-1.5 transition-colors"
+                >
+                  {updating ? <Loader2 size={14} className="animate-spin" /> : null}
+                  Dispatch Back to Principal
+                </button>
+              )}
+            </>
           )}
-          {order.status === 5 && (
-            <button
-              onClick={() => handleUpdateStatus(2)}
-              disabled={updating}
-              className="bg-[#f5a623] hover:bg-[#e0951c] disabled:opacity-50 text-black font-bold text-xs px-4 py-2.5 rounded-xl border-none cursor-pointer flex items-center gap-1.5"
-            >
-              {updating ? <Loader2 size={14} className="animate-spin" /> : null}
-              Start Production
-            </button>
+
+          {/* Principal status actions */}
+          {appMode === 'principal' && !isCompleted && !isCancelled && (
+            <>
+              <button
+                onClick={() => handleUpdateStatus(6)}
+                disabled={updating}
+                className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-black font-bold text-xs px-4 py-2.5 rounded-xl border-none cursor-pointer flex items-center gap-1.5 transition-colors"
+              >
+                {updating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                Mark Completed
+              </button>
+              <button
+                onClick={() => handleUpdateStatus(7)}
+                disabled={updating}
+                className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold text-xs px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-1.5 transition-colors"
+              >
+                Cancel Order
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -268,7 +308,7 @@ export const JobOrderDetail: React.FC = () => {
           <div className="bg-[#1a1a1a] border border-[#2a2a2a] p-4 rounded-xl text-center">
             <span className="text-[11px] text-[#888] font-medium block">Due Date</span>
             <span className={`text-sm font-bold font-mono mt-1 block ${order.due_date ? 'text-amber-400' : 'text-[#555]'}`}>
-              {order.due_date ?? '—'}
+              {order.due_date ? String(order.due_date).split('T')[0] : '—'}
             </span>
           </div>
         </div>
@@ -312,7 +352,7 @@ export const JobOrderDetail: React.FC = () => {
             {order.due_date && (
               <div className="py-2.5 flex justify-between gap-4">
                 <span className="text-[#888] flex-shrink-0">Due Date</span>
-                <span className="font-mono text-amber-400 font-bold">{order.due_date}</span>
+                <span className="font-mono text-amber-400 font-bold">{String(order.due_date).split('T')[0]}</span>
               </div>
             )}
             {order.notes && (
