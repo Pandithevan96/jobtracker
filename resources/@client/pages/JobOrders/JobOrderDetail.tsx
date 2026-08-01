@@ -1,65 +1,167 @@
-import React, { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import {
   FileText,
   ArrowLeft,
   Building2,
-  Calendar,
-  Clock,
   CheckCircle2,
-  Truck,
   MessageSquare,
-  Paperclip,
   Send,
-  AlertTriangle
+  Loader2,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
+import apiClient from '@/services/apiClient';
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+interface Vendor {
+  id: number;
+  shop_name: string;
+  contact_person: string;
+  phone: string;
+  email: string | null;
+}
+
+interface NoteUser {
+  id: number;
+  name: string;
+}
+
+interface OrderNote {
+  id: number;
+  note: string;
+  created_at: string;
+  user: NoteUser | null;
+}
+
+interface JobOrder {
+  id: number;
+  order_number: string;
+  part_name: string;
+  part_number: string | null;
+  process_type: string | null;
+  description: string | null;
+  quantity_sent: number;
+  uom: string;
+  due_date: string | null;
+  status: number;
+  priority: number;
+  notes: string | null;
+  vendor: Vendor | null;
+  orderNotes: OrderNote[];
+}
+
+// ─── Status helpers ──────────────────────────────────────────────────────────
+
+const STATUS_MAP: Record<number, { label: string; color: string }> = {
+  1: { label: 'Draft',       color: 'bg-[#333]/40 text-[#aaa] border-[#444]' },
+  2: { label: 'In Progress', color: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
+  3: { label: 'Completed',   color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
+  4: { label: 'Cancelled',   color: 'bg-rose-500/15 text-rose-400 border-rose-500/30' },
+  5: { label: 'Pending',     color: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
+};
+
+function statusInfo(s: number) {
+  return STATUS_MAP[s] ?? { label: `Status ${s}`, color: 'bg-[#333]/40 text-[#aaa] border-[#444]' };
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export const JobOrderDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
 
-  const [status, setStatus] = useState<'pending' | 'in_progress' | 'completed' | 'cancelled'>('in_progress');
-  const [newNote, setNewNote] = useState('');
-  const [notes, setNotes] = useState([
-    { id: 1, author: 'Senthil Kumar (Production Lead)', text: 'Raw material 42CrMo4 dispatched via DC-2026-042.', date: '2026-07-25 10:30 AM' },
-    { id: 2, author: 'Vendor (Apex Precision)', text: 'Rough turning completed. Moving to heat treatment stage.', date: '2026-07-27 04:15 PM' },
-  ]);
+  const [order, setOrder]       = useState<JobOrder | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
+  const [newNote, setNewNote]   = useState('');
+  const [sending, setSending]   = useState(false);
+  const [updating, setUpdating] = useState(false);
 
-  const orderData = {
-    id: id || '1',
-    job_order_number: `JO-2026-00${id || '1'}`,
-    vendor_name: 'Apex Precision Engineering',
-    vendor_contact: '+91 98401 23456 | ops@apexprecision.in',
-    item_name: 'CNC Turned Shaft Pins M12 x 150mm',
-    process_type: 'CNC Turning & Precision Grinding',
-    raw_material: 'EN8 D-Bar Stock Ø25mm',
-    quantity: 500,
-    completed_qty: 350,
-    rejected_qty: 12,
-    dispatch_date: '2026-07-25',
-    expected_delivery: '2026-08-05',
-    status: status,
+  // ── Fetch order details ──────────────────────────────────────────────────
+  const fetchOrder = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiClient.post('/job-orders/details', { id: Number(id) });
+      const data = res.data?.data ?? res.data;
+      setOrder(data);
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? 'Failed to load job order.');
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => { fetchOrder(); }, [fetchOrder]);
+
+  // ── Update status ────────────────────────────────────────────────────────
+  const handleUpdateStatus = async (newStatus: number) => {
+    if (!order) return;
+    setUpdating(true);
+    try {
+      await apiClient.post('/job-orders/update-status', { id: order.id, status: newStatus });
+      setOrder((prev) => prev ? { ...prev, status: newStatus } : prev);
+    } catch (e: any) {
+      alert(e?.response?.data?.message ?? 'Failed to update status.');
+    } finally {
+      setUpdating(false);
+    }
   };
 
-  const handleAddNote = (e: React.FormEvent) => {
+  // ── Add note ─────────────────────────────────────────────────────────────
+  const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newNote.trim()) return;
-
-    setNotes([
-      ...notes,
-      {
-        id: Date.now(),
-        author: 'You (Web Portal)',
-        text: newNote.trim(),
-        date: new Date().toLocaleString(),
-      },
-    ]);
-    setNewNote('');
+    if (!newNote.trim() || !order) return;
+    setSending(true);
+    try {
+      await apiClient.post('/job-orders/add-note', { id: order.id, note: newNote.trim() });
+      setNewNote('');
+      await fetchOrder(); // refresh to get the new note from server
+    } catch (e: any) {
+      alert(e?.response?.data?.message ?? 'Failed to add note.');
+    } finally {
+      setSending(false);
+    }
   };
+
+  // ── Loading ───────────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64 text-[#888]">
+        <Loader2 className="animate-spin mr-3" size={22} />
+        <span className="text-sm">Loading job order…</span>
+      </div>
+    );
+  }
+
+  // ── Error ─────────────────────────────────────────────────────────────────
+  if (error || !order) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4 text-rose-400">
+        <AlertCircle size={32} />
+        <p className="text-sm">{error ?? 'Job order not found.'}</p>
+        <button
+          onClick={fetchOrder}
+          className="flex items-center gap-2 text-xs bg-[#1a1a1a] border border-[#2a2a2a] px-4 py-2 rounded-xl hover:border-[#f5a623] transition-colors text-[#aaa]"
+        >
+          <RefreshCw size={14} /> Retry
+        </button>
+        <Link to="/job-orders" className="text-xs text-[#666] hover:text-white transition-colors">
+          ← Back to Job Orders
+        </Link>
+      </div>
+    );
+  }
+
+  const { label: statusLabel, color: statusColor } = statusInfo(order.status);
+  const isCompleted  = order.status === 3;
+  const isCancelled  = order.status === 4;
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
-      {/* Back Button */}
+      {/* Back */}
       <Link
         to="/job-orders"
         className="inline-flex items-center gap-2 text-xs font-bold text-[#888] hover:text-white no-underline transition-colors"
@@ -67,118 +169,152 @@ export const JobOrderDetail: React.FC = () => {
         <ArrowLeft size={16} /> Back to Job Orders
       </Link>
 
-      {/* Header Info Banner */}
+      {/* Header */}
       <div className="bg-[#141414] border border-[#262626] rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-2xl font-black text-white font-mono">{orderData.job_order_number}</h1>
-            <span className="bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs px-3 py-1 rounded-full font-bold uppercase">
-              {orderData.status.replace('_', ' ')}
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
+            <h1 className="text-2xl font-black text-white font-mono">{order.order_number}</h1>
+            <span className={`border text-xs px-3 py-1 rounded-full font-bold uppercase ${statusColor}`}>
+              {statusLabel}
             </span>
           </div>
-          <p className="text-xs text-[#888] flex items-center gap-2">
-            <Building2 size={14} className="text-amber-400" />
-            <span className="font-semibold text-gray-200">{orderData.vendor_name}</span>
-            <span className="text-[#555]">|</span>
-            <span>{orderData.vendor_contact}</span>
-          </p>
+          {order.vendor ? (
+            <p className="text-xs text-[#888] flex items-center gap-2 flex-wrap">
+              <Building2 size={14} className="text-amber-400 flex-shrink-0" />
+              <span className="font-semibold text-gray-200">{order.vendor.shop_name}</span>
+              {(order.vendor.phone || order.vendor.email) && (
+                <>
+                  <span className="text-[#555]">|</span>
+                  <span>{order.vendor.phone}{order.vendor.email ? ` | ${order.vendor.email}` : ''}</span>
+                </>
+              )}
+            </p>
+          ) : (
+            <p className="text-xs text-[#555]">No vendor assigned</p>
+          )}
         </div>
 
-        {/* Workflow Action Buttons */}
-        <div className="flex items-center gap-2">
-          {status !== 'completed' && (
+        {/* Action buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {!isCompleted && !isCancelled && (
             <button
-              onClick={() => setStatus('completed')}
-              className="bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs px-4 py-2.5 rounded-xl border-none cursor-pointer flex items-center gap-1.5 transition-colors"
+              onClick={() => handleUpdateStatus(3)}
+              disabled={updating}
+              className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-black font-bold text-xs px-4 py-2.5 rounded-xl border-none cursor-pointer flex items-center gap-1.5 transition-colors"
             >
-              <CheckCircle2 size={16} /> Mark Completed
+              {updating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={16} />}
+              Mark Completed
             </button>
           )}
-          {status === 'pending' && (
+          {order.status === 5 && (
             <button
-              onClick={() => setStatus('in_progress')}
-              className="bg-[#f5a623] hover:bg-[#e0951c] text-black font-bold text-xs px-4 py-2.5 rounded-xl border-none cursor-pointer flex items-center gap-1.5"
+              onClick={() => handleUpdateStatus(2)}
+              disabled={updating}
+              className="bg-[#f5a623] hover:bg-[#e0951c] disabled:opacity-50 text-black font-bold text-xs px-4 py-2.5 rounded-xl border-none cursor-pointer flex items-center gap-1.5"
             >
+              {updating ? <Loader2 size={14} className="animate-spin" /> : null}
               Start Production
             </button>
           )}
         </div>
       </div>
 
-      {/* Progress Timeline Tracker */}
+      {/* Progress stats */}
       <div className="bg-[#141414] border border-[#262626] rounded-2xl p-6">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-[#888] mb-4">Production Progress</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-[#888] mb-4">Order Summary</h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div className="bg-[#1a1a1a] border border-[#2a2a2a] p-4 rounded-xl text-center">
             <span className="text-[11px] text-[#888] font-medium block">Total Ordered</span>
-            <span className="text-xl font-extrabold text-white font-mono mt-1 block">{orderData.quantity} Pcs</span>
+            <span className="text-xl font-extrabold text-white font-mono mt-1 block">
+              {order.quantity_sent} <span className="text-sm font-normal text-[#666]">{order.uom}</span>
+            </span>
           </div>
-          <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl text-center">
-            <span className="text-[11px] text-emerald-400 font-medium block">Received Good</span>
-            <span className="text-xl font-extrabold text-emerald-300 font-mono mt-1 block">{orderData.completed_qty} Pcs</span>
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] p-4 rounded-xl text-center">
+            <span className="text-[11px] text-[#888] font-medium block">Part / Item</span>
+            <span className="text-sm font-bold text-white mt-1 block truncate" title={order.part_name}>
+              {order.part_name}
+            </span>
           </div>
-          <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-xl text-center">
-            <span className="text-[11px] text-rose-400 font-medium block">Quality Rejected</span>
-            <span className="text-xl font-extrabold text-rose-300 font-mono mt-1 block">{orderData.rejected_qty} Pcs</span>
-          </div>
-          <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl text-center">
-            <span className="text-[11px] text-amber-400 font-medium block">Balance Pending</span>
-            <span className="text-xl font-extrabold text-amber-300 font-mono mt-1 block">
-              {orderData.quantity - orderData.completed_qty - orderData.rejected_qty} Pcs
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] p-4 rounded-xl text-center">
+            <span className="text-[11px] text-[#888] font-medium block">Due Date</span>
+            <span className={`text-sm font-bold font-mono mt-1 block ${order.due_date ? 'text-amber-400' : 'text-[#555]'}`}>
+              {order.due_date ?? '—'}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Specifications & Notes Split */}
+      {/* Specs & Notes */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Specifications Card */}
+        {/* Specifications */}
         <div className="bg-[#141414] border border-[#262626] rounded-2xl p-6 space-y-4">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
             <FileText size={18} className="text-amber-400" />
             Job Order Specifications
           </h3>
           <div className="divide-y divide-[#222] text-xs">
-            <div className="py-2.5 flex justify-between">
-              <span className="text-[#888]">Item Description</span>
-              <span className="font-semibold text-white text-right">{orderData.item_name}</span>
+            <div className="py-2.5 flex justify-between gap-4">
+              <span className="text-[#888] flex-shrink-0">Item Name</span>
+              <span className="font-semibold text-white text-right">{order.part_name}</span>
             </div>
-            <div className="py-2.5 flex justify-between">
-              <span className="text-[#888]">Manufacturing Process</span>
-              <span className="font-semibold text-white">{orderData.process_type}</span>
+            {order.part_number && (
+              <div className="py-2.5 flex justify-between gap-4">
+                <span className="text-[#888] flex-shrink-0">Part Number</span>
+                <span className="font-semibold text-white font-mono text-right">{order.part_number}</span>
+              </div>
+            )}
+            {order.process_type && (
+              <div className="py-2.5 flex justify-between gap-4">
+                <span className="text-[#888] flex-shrink-0">Process Type</span>
+                <span className="font-semibold text-white text-right">{order.process_type}</span>
+              </div>
+            )}
+            {order.description && (
+              <div className="py-2.5 flex justify-between gap-4">
+                <span className="text-[#888] flex-shrink-0">Description</span>
+                <span className="font-semibold text-white text-right">{order.description}</span>
+              </div>
+            )}
+            <div className="py-2.5 flex justify-between gap-4">
+              <span className="text-[#888] flex-shrink-0">Quantity</span>
+              <span className="font-mono text-gray-300">{order.quantity_sent} {order.uom}</span>
             </div>
-            <div className="py-2.5 flex justify-between">
-              <span className="text-[#888]">Raw Material Grade</span>
-              <span className="font-semibold text-white">{orderData.raw_material}</span>
-            </div>
-            <div className="py-2.5 flex justify-between">
-              <span className="text-[#888]">Dispatch Date</span>
-              <span className="font-mono text-gray-300">{orderData.dispatch_date}</span>
-            </div>
-            <div className="py-2.5 flex justify-between">
-              <span className="text-[#888]">Expected Delivery</span>
-              <span className="font-mono text-amber-400 font-bold">{orderData.expected_delivery}</span>
-            </div>
+            {order.due_date && (
+              <div className="py-2.5 flex justify-between gap-4">
+                <span className="text-[#888] flex-shrink-0">Due Date</span>
+                <span className="font-mono text-amber-400 font-bold">{order.due_date}</span>
+              </div>
+            )}
+            {order.notes && (
+              <div className="py-2.5 flex flex-col gap-1">
+                <span className="text-[#888]">Notes</span>
+                <span className="text-gray-300 leading-relaxed">{order.notes}</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Notes & Updates Feed */}
+        {/* Notes feed */}
         <div className="bg-[#141414] border border-[#262626] rounded-2xl p-6 flex flex-col justify-between space-y-4">
           <div>
             <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
               <MessageSquare size={18} className="text-blue-400" />
-              Audit Notes & Log
+              Audit Notes &amp; Log
             </h3>
             <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
-              {notes.map((note) => (
-                <div key={note.id} className="bg-[#1a1a1a] border border-[#2a2a2a] p-3 rounded-xl text-xs space-y-1">
-                  <div className="flex justify-between items-center text-[10px] text-[#777]">
-                    <span className="font-bold text-amber-400">{note.author}</span>
-                    <span>{note.date}</span>
+              {order.orderNotes && order.orderNotes.length > 0 ? (
+                order.orderNotes.map((n) => (
+                  <div key={n.id} className="bg-[#1a1a1a] border border-[#2a2a2a] p-3 rounded-xl text-xs space-y-1">
+                    <div className="flex justify-between items-center text-[10px] text-[#777]">
+                      <span className="font-bold text-amber-400">{n.user?.name ?? 'System'}</span>
+                      <span>{new Date(n.created_at).toLocaleString()}</span>
+                    </div>
+                    <p className="text-gray-200">{n.note}</p>
                   </div>
-                  <p className="text-gray-200">{note.text}</p>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-xs text-[#555] text-center py-4">No notes yet. Add the first update below.</p>
+              )}
             </div>
           </div>
 
@@ -188,13 +324,15 @@ export const JobOrderDetail: React.FC = () => {
               placeholder="Add progress note or update..."
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
-              className="flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-xs px-3.5 py-2 text-white focus:outline-none focus:border-[#f5a623]"
+              disabled={sending}
+              className="flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-xs px-3.5 py-2 text-white focus:outline-none focus:border-[#f5a623] disabled:opacity-50"
             />
             <button
               type="submit"
-              className="bg-[#f5a623] hover:bg-[#e0951c] text-black font-bold p-2.5 rounded-xl border-none cursor-pointer flex items-center justify-center"
+              disabled={sending || !newNote.trim()}
+              className="bg-[#f5a623] hover:bg-[#e0951c] disabled:opacity-50 text-black font-bold p-2.5 rounded-xl border-none cursor-pointer flex items-center justify-center transition-colors"
             >
-              <Send size={16} />
+              {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
             </button>
           </form>
         </div>
