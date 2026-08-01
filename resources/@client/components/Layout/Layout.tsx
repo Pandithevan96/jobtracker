@@ -16,12 +16,13 @@ import {
     ChevronRight,
     Menu,
     X,
-    Search,
     Plus,
+    RefreshCw,
+    PackageCheck,
 } from "lucide-react";
 
 export const Layout: React.FC = () => {
-    const { user, logout } = useAuth();
+    const { user, logout, appMode, setAppMode } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -127,30 +128,38 @@ export const Layout: React.FC = () => {
         (w) => w.id === activeWorkspaceId,
     )?.name;
 
-    const navigationItems = [
-        { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+    const allNavigationItems = [
+        { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard, principalOnly: false },
         {
             name: "Job Orders",
             path: "/job-orders",
             icon: FileText,
             badge: "Active",
+            principalOnly: false,
         },
-        { name: "Delivery Challans", path: "/challans", icon: Truck },
+        { name: "Delivery Challans", path: "/challans", icon: Truck, principalOnly: false },
         {
             name: "Quality Rejections",
             path: "/rejections",
             icon: AlertTriangle,
+            principalOnly: false,
         },
-        { name: "Reconciliations", path: "/reconciliations", icon: Scale },
-        { name: "Vendors", path: "/vendors", icon: Building2 },
-        { name: "Notifications", path: "/notifications", icon: Bell, count: notifCount },
+        { name: "Reconciliations", path: "/reconciliations", icon: Scale, principalOnly: false },
+        { name: "Vendors", path: "/vendors", icon: Building2, principalOnly: true },
+        { name: "Notifications", path: "/notifications", icon: Bell, count: notifCount, principalOnly: false },
         {
             name: "Workspace Settings",
             path: "/workspace/settings",
             icon: Settings,
+            principalOnly: true,
         },
-        { name: "My Profile", path: "/profile", icon: User },
+        { name: "My Profile", path: "/profile", icon: User, principalOnly: false },
     ];
+
+    // Hide principal-only items when in Vendor mode
+    const navigationItems = allNavigationItems.filter(
+        (item) => !item.principalOnly || appMode === 'principal'
+    );
 
     const activeItem =
         navigationItems.find((item) =>
@@ -245,17 +254,42 @@ export const Layout: React.FC = () => {
                             )}
                         </div>
                     )}
+
+                    {/* Mode Badge */}
+                    <div className="hidden lg:flex items-center gap-2">
+                        <span
+                            className={`flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
+                                appMode === 'principal'
+                                    ? 'bg-[#f5a623]/10 text-[#f5a623] border-[#f5a623]/30'
+                                    : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                            }`}
+                        >
+                            {appMode === 'principal'
+                                ? <><Building2 size={12} /> Principal</>
+                                : <><PackageCheck size={12} /> Vendor</>
+                            }
+                        </span>
+                        <button
+                            onClick={() => { window.location.href = '/select-role'; }}
+                            title="Switch mode"
+                            className="p-1.5 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] text-[#666] hover:text-white hover:border-[#3a3a3a] transition-all"
+                        >
+                            <RefreshCw size={13} />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                    {/* Quick Actions */}
-                    <Link
-                        to="/job-orders?action=new"
-                        className="hidden sm:flex items-center gap-1.5 bg-[#f5a623] text-black font-semibold text-xs px-3.5 py-2 rounded-xl hover:bg-[#e0951c] transition-colors no-underline"
-                    >
-                        <Plus size={16} />
-                        <span>New Job Order</span>
-                    </Link>
+                    {/* Quick Actions — only show in principal mode */}
+                    {appMode === 'principal' && (
+                        <Link
+                            to="/job-orders?action=new"
+                            className="hidden sm:flex items-center gap-1.5 bg-[#f5a623] text-black font-semibold text-xs px-3.5 py-2 rounded-xl hover:bg-[#e0951c] transition-colors no-underline"
+                        >
+                            <Plus size={16} />
+                            <span>New Job Order</span>
+                        </Link>
+                    )}
 
                     {/* Notification Bell */}
                     <Link

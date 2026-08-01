@@ -3,6 +3,7 @@ import { useRoutes, Navigate } from 'react-router-dom';
 
 import Login from '@/pages/Auth/Login';
 import Register from '@/pages/Auth/Register';
+import RoleSelectPage from '@/pages/Auth/RoleSelect';
 
 import Layout from '@/components/Layout/Layout';
 import ProtectedRoute from '@/components/Auth/ProtectedRoute';
@@ -31,6 +32,15 @@ function Router() {
     {
       path: '/register',
       element: <Register />,
+    },
+    {
+      element: <ProtectedRoute />,
+      children: [
+        {
+          path: '/select-role',
+          element: <RoleSelectPage />,
+        },
+      ],
     },
     {
       element: <ProtectedRoute />,

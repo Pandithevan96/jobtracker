@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import apiClient from "@/services/apiClient";
+import { useAuth } from "@/context/AuthContext";
 import {
     FileText,
     Truck,
@@ -67,11 +68,20 @@ const MetricCard: React.FC<MetricCardProps> = ({
 );
 
 /**
- * Reads the workspace_id cached by Layout.tsx / VendorsList.tsx.
- * If neither has run yet this session, falls back to fetching it directly.
- * Keep this in sync with the same helper in VendorsList.tsx.
+ * Returns the correct workspace_id based on the current app_mode.
+ * - Principal → uses `workspace_id` (owned workspace)
+ * - Vendor    → uses `vendor_workspace_id` (workspace where user is a vendor member)
+ * Falls back to fetching from API if nothing is cached.
  */
 const getCurrentWorkspaceId = async (): Promise<number | null> => {
+    const mode = localStorage.getItem("app_mode") ?? "principal";
+
+    // In vendor mode, prefer the vendor workspace
+    if (mode === "vendor") {
+        const vendorWsId = localStorage.getItem("vendor_workspace_id");
+        if (vendorWsId) return Number(vendorWsId);
+    }
+
     const cached = localStorage.getItem("workspace_id");
     if (cached) return Number(cached);
 
@@ -111,6 +121,7 @@ interface Challan {
 }
 
 export const Dashboard: React.FC = () => {
+    const { appMode } = useAuth();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -255,31 +266,34 @@ export const Dashboard: React.FC = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-[#191919] to-[#141414] p-6 rounded-2xl border border-[#2a2a2a]">
                 <div>
                     <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-                        Operational Overview{" "}
+                        {appMode === 'vendor' ? 'Received Orders Overview' : 'Operational Overview'}{" "}
                         <span className="text-[#f5a623]">⚡</span>
                     </h1>
                     <p className="text-sm text-[#888] mt-1">
-                        Real-time subcontracting job orders, delivery challans,
-                        and material reconciliations
+                        {appMode === 'vendor'
+                            ? 'Job orders assigned to you by principal companies'
+                            : 'Real-time subcontracting job orders, delivery challans, and material reconciliations'}
                     </p>
                 </div>
 
-                <div className="flex flex-wrap gap-3">
-                    <Link
-                        to="/job-orders"
-                        className="bg-[#f5a623] hover:bg-[#e0951c] text-black font-bold text-xs px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 no-underline"
-                    >
-                        <Plus size={16} />
-                        <span>Create Job Order</span>
-                    </Link>
-                    <Link
-                        to="/challans"
-                        className="bg-[#222] hover:bg-[#2a2a2a] text-white border border-[#333] font-bold text-xs px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 no-underline"
-                    >
-                        <Truck size={16} />
-                        <span>Issue Delivery Challan</span>
-                    </Link>
-                </div>
+                {appMode === 'principal' && (
+                    <div className="flex flex-wrap gap-3">
+                        <Link
+                            to="/job-orders"
+                            className="bg-[#f5a623] hover:bg-[#e0951c] text-black font-bold text-xs px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 no-underline"
+                        >
+                            <Plus size={16} />
+                            <span>Create Job Order</span>
+                        </Link>
+                        <Link
+                            to="/challans"
+                            className="bg-[#222] hover:bg-[#2a2a2a] text-white border border-[#333] font-bold text-xs px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 no-underline"
+                        >
+                            <Truck size={16} />
+                            <span>Issue Delivery Challan</span>
+                        </Link>
+                    </div>
+                )}
             </div>
 
             {/* Error state */}

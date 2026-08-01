@@ -81,7 +81,9 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             if (onLoginSuccess) {
                 onLoginSuccess(token, user);
             } else {
-                window.location.href = "/dashboard";
+                // Go to role selector — unless app_mode was already chosen this session
+                const savedMode = localStorage.getItem('app_mode');
+                window.location.href = savedMode ? '/dashboard' : '/select-role';
             }
         } catch (err) {
             const message =

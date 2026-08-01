@@ -57,7 +57,14 @@ export const JobOrdersList: React.FC = () => {
   const fetchJobOrders = async () => {
     setLoading(true);
     try {
-      let workspaceId = localStorage.getItem('workspace_id');
+      const mode = localStorage.getItem('app_mode') ?? 'principal';
+
+      // In vendor mode prefer the vendor workspace
+      let workspaceId: string | null =
+        mode === 'vendor'
+          ? (localStorage.getItem('vendor_workspace_id') ?? localStorage.getItem('workspace_id'))
+          : localStorage.getItem('workspace_id');
+
       if (!workspaceId) {
         const res = await apiClient.post('/workspaces/list');
         const list = res.data?.data;
