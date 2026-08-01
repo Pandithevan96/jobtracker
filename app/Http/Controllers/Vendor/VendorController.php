@@ -79,6 +79,26 @@ class VendorController extends Controller
                 'status'             => Vendor::STATUS_ACTIVE,
             ]);
 
+            // Auto-link registered user account and attach workspace membership if email/phone matches
+            $vendorEmail = $request->input('email');
+            $vendorPhone = $request->input('phone');
+            if ($vendorEmail || $vendorPhone) {
+                $targetUser = \App\Models\User\User::where(function($q) use ($vendorEmail, $vendorPhone) {
+                    if ($vendorEmail) $q->where('email', $vendorEmail);
+                    if ($vendorPhone) $q->orWhere('phone', $vendorPhone);
+                })->first();
+
+                if ($targetUser && $targetUser->id !== $user->id) {
+                    $workspace->members()->syncWithoutDetaching([
+                        $targetUser->id => [
+                            'role'   => Workspace::MEMBER_ROLE_VENDOR,
+                            'status' => Workspace::MEMBER_STATUS_ACTIVE,
+                        ],
+                    ]);
+                    $vendor->update(['user_id' => $targetUser->id]);
+                }
+            }
+
             return HelperFunction::response($vendor, null, 'Vendor created successfully', 'success', '000', Response::HTTP_CREATED);
         } catch (Exception $e) {
             return HelperFunction::response(null, null, 'Failed to create vendor: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);

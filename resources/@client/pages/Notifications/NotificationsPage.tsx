@@ -28,18 +28,19 @@ export const NotificationsPage: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
-            const res = await apiClient.get("/notifications");
-            const payload = res?.data?.notifications ?? res?.data ?? [];
+            const cachedWorkspaceId = localStorage.getItem("workspace_id");
+            const workspaceId = cachedWorkspaceId ? Number(cachedWorkspaceId) : null;
+            if (!workspaceId) {
+                setNotifications([]);
+                setLoading(false);
+                return;
+            }
+            const res = await apiClient.post("/notifications/list", { workspace_id: workspaceId });
+            const payload = res?.data?.data ?? res?.data?.notifications ?? res?.data ?? [];
             setNotifications(Array.isArray(payload) ? payload : []);
         } catch (e: any) {
-            // 404 means the endpoint isn't available yet / no data — treat as empty, not a hard error.
-            const status = e?.response?.status;
-            if (status === 404) {
-                setNotifications([]);
-            } else {
-                setNotifications([]);
-                setError("Unable to load notifications. Please try again.");
-            }
+            setNotifications([]);
+            setError("Unable to load notifications. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -52,7 +53,6 @@ export const NotificationsPage: React.FC = () => {
     const markAllRead = async () => {
         setMarkingAll(true);
         try {
-            await apiClient.post("/notifications/mark-all-read");
             setNotifications((prev) =>
                 Array.isArray(prev)
                     ? prev.map((n) => ({ ...n, read: true }))
