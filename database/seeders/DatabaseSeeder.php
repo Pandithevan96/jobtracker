@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             \Database\Seeders\User\RoleSeeder::class,
             \Database\Seeders\User\ModuleSeeder::class,
             \Database\Seeders\User\RolePermissionSeeder::class,
+            DemoSeeder::class,
         ]);
 
         User::factory()->create([
