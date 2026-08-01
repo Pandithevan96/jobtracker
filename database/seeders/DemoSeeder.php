@@ -130,6 +130,7 @@ class DemoSeeder extends Seeder
                 'contact_person' => 'User 2 Admin',
                 'email'          => 'user2@jobtrack.com',
                 'phone'          => '9876543212',
+                'qr_token'       => \Illuminate\Support\Str::random(64),
                 'status'         => Vendor::STATUS_ACTIVE,
             ]
         );
@@ -148,6 +149,7 @@ class DemoSeeder extends Seeder
                 'contact_person' => 'User 3 Admin',
                 'email'          => 'user3@jobtrack.com',
                 'phone'          => '9876543213',
+                'qr_token'       => \Illuminate\Support\Str::random(64),
                 'status'         => Vendor::STATUS_ACTIVE,
             ]
         );
@@ -167,6 +169,7 @@ class DemoSeeder extends Seeder
                 'contact_person' => 'User 3 Admin',
                 'email'          => 'user3@jobtrack.com',
                 'phone'          => '9876543213',
+                'qr_token'       => \Illuminate\Support\Str::random(64),
                 'status'         => Vendor::STATUS_ACTIVE,
             ]
         );
@@ -183,6 +186,7 @@ class DemoSeeder extends Seeder
 
         // Job Order 1: User 1 -> User 2
         $jo1 = JobOrder::create([
+            'order_number'  => 'JO-2026-00001',
             'workspace_id'  => $ws1->id,
             'vendor_id'     => $vendor1_2->id,
             'created_by'    => $user1->id,
@@ -207,6 +211,7 @@ class DemoSeeder extends Seeder
 
         // Job Order 2: User 1 -> User 3
         $jo2 = JobOrder::create([
+            'order_number'  => 'JO-2026-00002',
             'workspace_id'  => $ws1->id,
             'vendor_id'     => $vendor1_3->id,
             'created_by'    => $user1->id,
@@ -231,6 +236,7 @@ class DemoSeeder extends Seeder
 
         // Job Order 3: User 4 -> User 3
         $jo3 = JobOrder::create([
+            'order_number'  => 'JO-2026-00003',
             'workspace_id'  => $ws4->id,
             'vendor_id'     => $vendor4_3->id,
             'created_by'    => $user4->id,
