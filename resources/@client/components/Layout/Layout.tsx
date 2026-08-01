@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import apiClient from "@/services/apiClient";
@@ -36,6 +36,8 @@ export const Layout: React.FC = () => {
         null,
     );
     const [workspaceDropdownOpen, setWorkspaceDropdownOpen] = useState(false);
+    const [notifCount, setNotifCount] = useState(0);
+    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
         loadWorkspaces();
@@ -70,6 +72,41 @@ export const Layout: React.FC = () => {
             console.error("Failed to load workspace:", e);
         }
     };
+
+    // -------------------------------------------------------------------------
+    // Notification badge: fetch unread count from API, refresh every 60s
+    // -------------------------------------------------------------------------
+    const fetchNotifCount = useCallback(async (wsId: number) => {
+        try {
+            const res = await apiClient.post("/notifications/unread-count", {
+                workspace_id: wsId,
+            });
+            const count =
+                res?.data?.data?.count ??
+                res?.data?.count ??
+                0;
+            setNotifCount(count);
+        } catch {
+            // Silently fail — badge stays at last known value
+        }
+    }, []);
+
+    // Start / restart polling whenever the active workspace changes
+    useEffect(() => {
+        if (!activeWorkspaceId) return;
+
+        // Fetch immediately
+        fetchNotifCount(activeWorkspaceId);
+
+        // Then every 60 seconds
+        pollRef.current = setInterval(() => {
+            fetchNotifCount(activeWorkspaceId);
+        }, 60_000);
+
+        return () => {
+            if (pollRef.current) clearInterval(pollRef.current);
+        };
+    }, [activeWorkspaceId, fetchNotifCount]);
 
     // Called only when the user explicitly picks a different workspace
     // from the dropdown — this is the one place that should reload.
@@ -106,7 +143,7 @@ export const Layout: React.FC = () => {
         },
         { name: "Reconciliations", path: "/reconciliations", icon: Scale },
         { name: "Vendors", path: "/vendors", icon: Building2 },
-        { name: "Notifications", path: "/notifications", icon: Bell, count: 3 },
+        { name: "Notifications", path: "/notifications", icon: Bell, count: notifCount },
         {
             name: "Workspace Settings",
             path: "/workspace/settings",
@@ -226,9 +263,11 @@ export const Layout: React.FC = () => {
                         className="relative p-2.5 rounded-xl bg-[#1a1a1a] border border-[#2a2a2a] text-[#aaa] hover:text-white hover:border-[#3a3a3a] transition-all no-underline flex items-center justify-center"
                     >
                         <Bell size={18} />
-                        <span className="absolute -top-1 -right-1 bg-amber-500 text-black text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                            3
-                        </span>
+                        {notifCount > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-amber-500 text-black text-[10px] font-bold min-w-[16px] h-4 rounded-full flex items-center justify-center px-0.5">
+                                {notifCount > 99 ? "99+" : notifCount}
+                            </span>
+                        )}
                     </Link>
 
                     {/* User Dropdown */}
