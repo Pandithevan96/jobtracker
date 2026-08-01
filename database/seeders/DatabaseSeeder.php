@@ -21,11 +21,5 @@ class DatabaseSeeder extends Seeder
             \Database\Seeders\User\RolePermissionSeeder::class,
             DemoSeeder::class,
         ]);
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-            'role_id' => 2, // Principal
-        ]);
     }
 }
