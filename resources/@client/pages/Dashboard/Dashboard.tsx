@@ -399,7 +399,7 @@ export const Dashboard: React.FC = () => {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-[#222] text-xs">
-                                                {recentJobOrders.map((jo) => (
+                                                {recentJobOrders.map((jo: any) => (
                                                     <tr
                                                         key={jo.id}
                                                         className="hover:bg-[#1a1a1a] transition-colors"
@@ -410,19 +410,18 @@ export const Dashboard: React.FC = () => {
                                                                 className="no-underline text-amber-400 hover:underline"
                                                             >
                                                                 {
-                                                                    jo.order_number
+                                                                    jo.order_number || jo.job_order_number || `#${jo.id}`
                                                                 }
                                                             </Link>
                                                         </td>
                                                         <td className="py-3 px-3 text-gray-200 font-medium">
-                                                            {jo.vendor_name ||
-                                                                "—"}
+                                                            {jo.vendor?.shop_name || jo.vendor_name || "—"}
                                                         </td>
                                                         <td className="py-3 px-3 text-[#aaa] max-w-[200px] truncate">
-                                                            {jo.item || "—"}
+                                                            {jo.part_name || jo.item || "—"}
                                                         </td>
                                                         <td className="py-3 px-3 text-right font-mono font-bold text-white">
-                                                            {jo.qty ?? "—"}
+                                                            {jo.quantity_sent ?? jo.qty ?? "—"}
                                                         </td>
                                                         <td className="py-3 px-3">
                                                             {getStatusBadge(

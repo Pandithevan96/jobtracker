@@ -109,12 +109,19 @@ export const JobOrdersList: React.FC = () => {
 
   const fetchJobOrders = async () => {
     try {
-      const res = await apiClient.post('/job-orders/list');
-      if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) {
-        setJobOrders(res.data.data);
+      const cached = localStorage.getItem('workspace_id');
+      const workspaceId = cached ? Number(cached) : null;
+      if (!workspaceId) {
+        setLoading(false);
+        return;
+      }
+      const res = await apiClient.post('/job-orders/list', { workspace_id: workspaceId });
+      const list = res.data?.data;
+      if (Array.isArray(list)) {
+        setJobOrders(list);
       }
     } catch (e) {
-      console.log('Using local fallback job orders');
+      console.log('Failed to fetch job orders', e);
     } finally {
       setLoading(false);
     }
@@ -260,31 +267,31 @@ export const JobOrdersList: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-[#222] text-xs">
               {filteredOrders.length > 0 ? (
-                filteredOrders.map((order) => (
+                filteredOrders.map((order: any) => (
                   <tr key={order.id} className="hover:bg-[#1a1a1a] transition-colors">
                     <td className="py-3.5 px-4 font-mono font-bold text-amber-400">
-                      <Link to={`/job-orders/${order.id}`} className="no-underline text-amber-400 hover:underline">
-                        {order.job_order_number}
+                      <Link to={`/job-orders`} className="no-underline text-amber-400 hover:underline">
+                        {order.job_order_number || order.order_number || `#${order.id}`}
                       </Link>
                     </td>
                     <td className="py-3.5 px-4 font-semibold text-gray-200">
                       <div className="flex items-center gap-1.5">
                         <Building2 size={14} className="text-[#666]" />
-                        <span>{order.vendor_name}</span>
+                        <span>{order.vendor?.shop_name || order.vendor_name || '—'}</span>
                       </div>
                     </td>
                     <td className="py-3.5 px-4">
-                      <div className="font-semibold text-white">{order.item_name}</div>
-                      <div className="text-[11px] text-[#888]">{order.process_type}</div>
+                      <div className="font-semibold text-white">{order.part_name || order.item_name || '—'}</div>
+                      <div className="text-[11px] text-[#888]">{order.process_type || '—'}</div>
                     </td>
                     <td className="py-3.5 px-4 text-center font-mono font-bold">
                       <span className="text-white">{order.completed_quantity || 0}</span>
-                      <span className="text-[#666]"> / {order.quantity}</span>
+                      <span className="text-[#666]"> / {order.quantity_sent || order.quantity || 0}</span>
                     </td>
                     <td className="py-3.5 px-4 text-[#aaa] font-mono">
                       <div className="flex items-center gap-1">
                         <Calendar size={13} className="text-[#666]" />
-                        <span>{order.expected_delivery_date}</span>
+                        <span>{order.due_date ? String(order.due_date).split('T')[0] : (order.expected_delivery_date || '—')}</span>
                       </div>
                     </td>
                     <td className="py-3.5 px-4">{getStatusBadge(order.status)}</td>
