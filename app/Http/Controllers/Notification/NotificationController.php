@@ -74,6 +74,16 @@ class NotificationController extends Controller
             $query = Notification::with(['jobOrder', 'vendor', 'user'])
                 ->where('workspace_id', $workspaceId);
 
+            if ($user->isVendor()) {
+                $vendorIds = \App\Models\Vendor\Vendor::where('workspace_id', $workspaceId)
+                    ->where('user_id', $user->id)
+                    ->pluck('id');
+                $query->where(function ($q) use ($vendorIds, $user) {
+                    $q->whereIn('vendor_id', $vendorIds)
+                      ->orWhere('recipient_email', $user->email);
+                });
+            }
+
             if ($request->filled('channel')) {
                 $query->where('channel', $request->input('channel'));
             }
@@ -180,9 +190,20 @@ class NotificationController extends Controller
                 return HelperFunction::response(null, null, 'Workspace not found', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
-            $count = Notification::where('workspace_id', $workspaceId)
-                ->where('created_at', '>=', now()->subDays(30))
-                ->count();
+            $query = Notification::where('workspace_id', $workspaceId)
+                ->where('created_at', '>=', now()->subDays(30));
+
+            if ($user->isVendor()) {
+                $vendorIds = \App\Models\Vendor\Vendor::where('workspace_id', $workspaceId)
+                    ->where('user_id', $user->id)
+                    ->pluck('id');
+                $query->where(function ($q) use ($vendorIds, $user) {
+                    $q->whereIn('vendor_id', $vendorIds)
+                      ->orWhere('recipient_email', $user->email);
+                });
+            }
+
+            $count = $query->count();
 
             return HelperFunction::response(['count' => $count], null, 'Unread count fetched', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {

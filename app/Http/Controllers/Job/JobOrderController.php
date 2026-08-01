@@ -142,10 +142,18 @@ class JobOrderController extends Controller
             $query = JobOrder::with(['vendor', 'creator'])
                 ->where('workspace_id', $workspaceId);
 
+            // If authenticated user is a Vendor, restrict to job orders assigned to their vendor profile
+            if ($user->isVendor()) {
+                $vendorIds = Vendor::where('workspace_id', $workspaceId)
+                    ->where('user_id', $user->id)
+                    ->pluck('id');
+                $query->whereIn('vendor_id', $vendorIds);
+            }
+
             if ($request->filled('status')) {
                 $query->where('status', $request->input('status'));
             }
-            if ($request->filled('vendor_id')) {
+            if ($request->filled('vendor_id') && !$user->isVendor()) {
                 $query->where('vendor_id', $request->input('vendor_id'));
             }
             if ($request->filled('priority')) {
