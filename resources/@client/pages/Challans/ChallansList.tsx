@@ -116,20 +116,30 @@ export const ChallansList: React.FC = () => {
     setShowCreateModal(false);
   };
 
-  const filteredChallans = challans.filter((c) => {
+  const filteredChallans = challans.filter((c: any) => {
+    const dcNo = String(c.challan_number || c.dc_number || '');
+    const vendorName = String(c.vendor_name || c.vendor?.shop_name || '');
+    const joNo = String(c.job_order_number || c.job_order?.order_number || '');
+    const query = searchQuery.toLowerCase();
+
     const matchesSearch =
-      c.challan_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.vendor_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.job_order_number.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = typeFilter === 'all' || c.type === typeFilter;
+      dcNo.toLowerCase().includes(query) ||
+      vendorName.toLowerCase().includes(query) ||
+      joNo.toLowerCase().includes(query);
+
+    const matchesType = typeFilter === 'all' || String(c.type) === typeFilter;
     return matchesSearch && matchesType;
   });
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const getStatusBadge = (status: any) => {
+    const s = String(status ?? '').toLowerCase();
+    switch (s) {
+      case '3':
       case 'acknowledged':
         return <span className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-full font-semibold">Acknowledged</span>;
+      case '2':
       case 'in_transit':
+      case 'dispatched':
         return <span className="bg-blue-500/15 text-blue-400 border border-blue-500/30 text-xs px-2.5 py-1 rounded-full font-semibold">In Transit</span>;
       default:
         return <span className="bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-1 rounded-full font-semibold">Issued</span>;

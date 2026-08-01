@@ -209,8 +209,21 @@ export const Dashboard: React.FC = () => {
         }
     };
 
-    const getStatusBadge = (status: string) => {
-        switch ((status || "").toLowerCase()) {
+    const getStatusBadge = (status: any) => {
+        const str = String(status ?? "").toLowerCase();
+        switch (str) {
+            case "2":
+            case "material out":
+            case "in_progress":
+            case "in transit":
+            case "wip":
+            case "3":
+                return (
+                    <span className="bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-1 rounded-full font-semibold">
+                        In Progress
+                    </span>
+                );
+            case "6":
             case "completed":
             case "acknowledged":
             case "delivered":
@@ -219,17 +232,12 @@ export const Dashboard: React.FC = () => {
                         Completed
                     </span>
                 );
-            case "in_progress":
-            case "in transit":
-                return (
-                    <span className="bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-1 rounded-full font-semibold">
-                        In Progress
-                    </span>
-                );
+            case "7":
+            case "cancelled":
             case "rejected":
                 return (
                     <span className="bg-rose-500/15 text-rose-400 border border-rose-500/30 text-xs px-2.5 py-1 rounded-full font-semibold">
-                        Rejected
+                        Cancelled
                     </span>
                 );
             default:

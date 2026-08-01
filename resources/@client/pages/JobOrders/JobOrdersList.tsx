@@ -156,23 +156,36 @@ export const JobOrdersList: React.FC = () => {
     });
   };
 
-  const filteredOrders = jobOrders.filter((order) => {
-    const matchesSearch =
-      order.job_order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.vendor_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.item_name.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredOrders = jobOrders.filter((order: any) => {
+    const orderNo = String(order.job_order_number || order.order_number || '');
+    const vendorName = String(order.vendor_name || order.vendor?.shop_name || '');
+    const itemName = String(order.item_name || order.part_name || '');
+    const query = searchQuery.toLowerCase();
 
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+    const matchesSearch =
+      orderNo.toLowerCase().includes(query) ||
+      vendorName.toLowerCase().includes(query) ||
+      itemName.toLowerCase().includes(query);
+
+    const matchesStatus = statusFilter === 'all' || String(order.status) === String(statusFilter);
 
     return matchesSearch && matchesStatus;
   });
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const getStatusBadge = (status: any) => {
+    const s = String(status ?? '').toLowerCase();
+    switch (s) {
+      case '6':
       case 'completed':
         return <span className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-full font-semibold">Completed</span>;
+      case '2':
+      case '3':
+      case '4':
       case 'in_progress':
+      case 'wip':
+      case 'material out':
         return <span className="bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-1 rounded-full font-semibold">In Progress</span>;
+      case '7':
       case 'cancelled':
         return <span className="bg-rose-500/15 text-rose-400 border border-rose-500/30 text-xs px-2.5 py-1 rounded-full font-semibold">Cancelled</span>;
       default:
