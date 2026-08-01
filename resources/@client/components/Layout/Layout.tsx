@@ -51,23 +51,32 @@ export const Layout: React.FC = () => {
                 console.error("Failed to fetch workspaces:", res.data.message);
                 return;
             }
-            const list = res.data?.data;
-            if (Array.isArray(list) && list.length > 0) {
-                setWorkspaces(list);
+            const allList: any[] = res.data?.data ?? [];
+            if (!Array.isArray(allList) || allList.length === 0) return;
 
-                const cachedId = localStorage.getItem("workspace_id");
-                const matchesCached =
-                    cachedId &&
-                    list.some((w: any) => String(w.id) === cachedId);
-                const active = matchesCached ? Number(cachedId) : list[0].id;
-                const activeWs = list.find((w: any) => w.id === active);
+            // ── Filter by current mode ──────────────────────────────────────
+            // Principal → only workspaces this user OWNS (owner_id === user.id)
+            // Vendor    → only workspaces this user is a MEMBER of (not owner)
+            const filtered =
+                appMode === "vendor"
+                    ? allList.filter((w) => w.owner_id !== user?.id)
+                    : allList.filter((w) => w.owner_id === user?.id);
 
-                if (activeWs) {
-                    // Silent restore on page load — just set state, no reload.
-                    localStorage.setItem("workspace_id", String(activeWs.id));
-                    localStorage.setItem("workspace_name", activeWs.name);
-                    setActiveWorkspaceId(activeWs.id);
-                }
+            // Fallback: if filter yields nothing (e.g. mode mismatch), show all
+            const list = filtered.length > 0 ? filtered : allList;
+            setWorkspaces(list);
+
+            // Restore active workspace from localStorage if it's in the filtered set
+            const cachedId = localStorage.getItem("workspace_id");
+            const matchesCached =
+                cachedId && list.some((w: any) => String(w.id) === cachedId);
+            const active = matchesCached ? Number(cachedId) : list[0].id;
+            const activeWs = list.find((w: any) => w.id === active);
+
+            if (activeWs) {
+                localStorage.setItem("workspace_id", String(activeWs.id));
+                localStorage.setItem("workspace_name", activeWs.name);
+                setActiveWorkspaceId(activeWs.id);
             }
         } catch (e) {
             console.error("Failed to load workspace:", e);
