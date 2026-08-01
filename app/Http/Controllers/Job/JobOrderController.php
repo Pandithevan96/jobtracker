@@ -139,7 +139,7 @@ class JobOrderController extends Controller
                 return HelperFunction::response(null, null, 'Workspace not found or you do not belong to it', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
-            $query = JobOrder::with(['vendor', 'creator'])
+            $query = JobOrder::with(['vendor', 'creator', 'workspace'])
                 ->where('workspace_id', $workspaceId);
 
             // If authenticated user is a Vendor, restrict to job orders assigned to their vendor profile
@@ -185,7 +185,7 @@ class JobOrderController extends Controller
             }
 
             $user = Auth::user();
-            $jobOrder = JobOrder::with(['vendor', 'creator', 'statusLogs.changedBy', 'orderNotes.user'])->find($request->input('id'));
+            $jobOrder = JobOrder::with(['vendor', 'creator', 'workspace', 'statusLogs.changedBy', 'orderNotes.user'])->find($request->input('id'));
 
             $workspace = Workspace::where('id', $jobOrder->workspace_id)
                 ->where(function ($q) use ($user) {

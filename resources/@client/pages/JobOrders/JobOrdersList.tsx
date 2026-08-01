@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import apiClient from '@/services/apiClient';
+import { useAuth } from '@/context/AuthContext';
 import {
   FileText,
   Search,
@@ -32,6 +33,7 @@ export interface JobOrder {
 }
 
 export const JobOrdersList: React.FC = () => {
+  const { appMode } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -224,7 +226,7 @@ export const JobOrdersList: React.FC = () => {
             <thead>
               <tr className="border-b border-[#262626] text-[11px] uppercase tracking-wider text-[#777] bg-[#111]">
                 <th className="py-3 px-4">Job Order #</th>
-                <th className="py-3 px-4">Vendor</th>
+                <th className="py-3 px-4">{appMode === 'vendor' ? 'Principal / Sender' : 'Vendor'}</th>
                 <th className="py-3 px-4">Process / Item</th>
                 <th className="py-3 px-4 text-center">Quantity</th>
                 <th className="py-3 px-4">Expected Date</th>
@@ -244,7 +246,11 @@ export const JobOrdersList: React.FC = () => {
                     <td className="py-3.5 px-4 font-semibold text-gray-200">
                       <div className="flex items-center gap-1.5">
                         <Building2 size={14} className="text-[#666]" />
-                        <span>{order.vendor?.shop_name || order.vendor_name || '—'}</span>
+                        <span>
+                          {appMode === 'vendor'
+                            ? (order.workspace?.name || order.creator?.name || '—')
+                            : (order.vendor?.shop_name || order.vendor_name || '—')}
+                        </span>
                       </div>
                     </td>
                     <td className="py-3.5 px-4">

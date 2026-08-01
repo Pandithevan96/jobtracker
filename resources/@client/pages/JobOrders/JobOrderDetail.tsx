@@ -12,6 +12,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import apiClient from '@/services/apiClient';
+import { useAuth } from '@/context/AuthContext';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,20 @@ interface OrderNote {
   user: NoteUser | null;
 }
 
+interface Workspace {
+  id: number;
+  name: string;
+  phone?: string;
+  email?: string;
+  city?: string;
+}
+
+interface Creator {
+  id: number;
+  name: string;
+  email: string;
+}
+
 interface JobOrder {
   id: number;
   order_number: string;
@@ -49,6 +64,8 @@ interface JobOrder {
   priority: number;
   notes: string | null;
   vendor: Vendor | null;
+  workspace?: Workspace | null;
+  creator?: Creator | null;
   orderNotes: OrderNote[];
 }
 
@@ -69,6 +86,7 @@ function statusInfo(s: number) {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export const JobOrderDetail: React.FC = () => {
+  const { appMode } = useAuth();
   const { id } = useParams<{ id: string }>();
 
   const [order, setOrder]       = useState<JobOrder | null>(null);
@@ -178,7 +196,19 @@ export const JobOrderDetail: React.FC = () => {
               {statusLabel}
             </span>
           </div>
-          {order.vendor ? (
+          {appMode === 'vendor' ? (
+            <p className="text-xs text-[#888] flex items-center gap-2 flex-wrap">
+              <Building2 size={14} className="text-emerald-400 flex-shrink-0" />
+              <span className="text-[#aaa]">Principal:</span>
+              <span className="font-semibold text-gray-200">{order.workspace?.name || order.creator?.name || '—'}</span>
+              {(order.workspace?.phone || order.creator?.email) && (
+                <>
+                  <span className="text-[#555]">|</span>
+                  <span>{order.workspace?.phone || order.creator?.email}</span>
+                </>
+              )}
+            </p>
+          ) : order.vendor ? (
             <p className="text-xs text-[#888] flex items-center gap-2 flex-wrap">
               <Building2 size={14} className="text-amber-400 flex-shrink-0" />
               <span className="font-semibold text-gray-200">{order.vendor.shop_name}</span>

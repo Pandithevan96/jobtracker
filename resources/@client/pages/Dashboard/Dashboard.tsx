@@ -399,7 +399,7 @@ export const Dashboard: React.FC = () => {
                                                         Order Ref
                                                     </th>
                                                     <th className="py-2.5 px-3">
-                                                        Vendor
+                                                        {appMode === 'vendor' ? 'Principal / Sender' : 'Vendor'}
                                                     </th>
                                                     <th className="py-2.5 px-3">
                                                         Item / Description
@@ -429,7 +429,9 @@ export const Dashboard: React.FC = () => {
                                                             </Link>
                                                         </td>
                                                         <td className="py-3 px-3 text-gray-200 font-medium">
-                                                            {jo.vendor?.shop_name || jo.vendor_name || "—"}
+                                                            {appMode === 'vendor'
+                                                                ? (jo.workspace?.name || jo.creator?.name || "—")
+                                                                : (jo.vendor?.shop_name || jo.vendor_name || "—")}
                                                         </td>
                                                         <td className="py-3 px-3 text-[#aaa] max-w-[200px] truncate">
                                                             {jo.part_name || jo.item || "—"}
