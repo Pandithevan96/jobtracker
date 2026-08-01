@@ -41,41 +41,7 @@ export const ChallansList: React.FC = () => {
     notes: 'Handle precision ground parts with anti-rust oil wrap',
   });
 
-  const [challans, setChallans] = useState<Challan[]>([
-    {
-      id: 1,
-      challan_number: 'DC-2026-042',
-      job_order_number: 'JO-2026-001',
-      vendor_name: 'Apex Precision Engineering',
-      type: 'outward',
-      items_count: 3,
-      vehicle_number: 'TN 37 AB 1234',
-      status: 'in_transit',
-      date: '2026-07-28',
-    },
-    {
-      id: 2,
-      challan_number: 'DC-2026-041',
-      job_order_number: 'JO-2026-002',
-      vendor_name: 'Sri Krishna Heat Treatments',
-      type: 'inward',
-      items_count: 1,
-      vehicle_number: 'TN 38 C 5678',
-      status: 'acknowledged',
-      date: '2026-07-27',
-    },
-    {
-      id: 3,
-      challan_number: 'DC-2026-040',
-      job_order_number: 'JO-2026-003',
-      vendor_name: 'Vanguard Anodizers',
-      type: 'outward',
-      items_count: 4,
-      vehicle_number: 'TN 37 E 9101',
-      status: 'issued',
-      date: '2026-07-26',
-    },
-  ]);
+  const [challans, setChallans] = useState<Challan[]>([]);
 
   useEffect(() => {
     fetchChallans();
@@ -83,12 +49,27 @@ export const ChallansList: React.FC = () => {
 
   const fetchChallans = async () => {
     try {
-      const res = await apiClient.post('/challans/list');
-      if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) {
-        setChallans(res.data.data);
+      let workspaceId = localStorage.getItem('workspace_id');
+      if (!workspaceId) {
+        const wsRes = await apiClient.post('/workspaces/list');
+        const list = wsRes.data?.data;
+        if (Array.isArray(list) && list.length > 0) {
+          workspaceId = list[0].id;
+          localStorage.setItem('workspace_id', String(workspaceId));
+        }
+      }
+      if (!workspaceId) return;
+
+      const res = await apiClient.post('/challans/list', { workspace_id: Number(workspaceId) });
+      const list = res.data?.data;
+      if (Array.isArray(list)) {
+        setChallans(list);
+      } else {
+        setChallans([]);
       }
     } catch (e) {
-      console.log('Using local fallback challans');
+      console.log('Failed to fetch challans', e);
+      setChallans([]);
     }
   };
 

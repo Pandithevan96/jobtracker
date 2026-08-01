@@ -48,80 +48,40 @@ export const JobOrdersList: React.FC = () => {
     notes: '',
   });
 
-  const [jobOrders, setJobOrders] = useState<JobOrder[]>([
-    {
-      id: 1,
-      job_order_number: 'JO-2026-001',
-      vendor_name: 'Apex Precision Engineering',
-      item_name: 'CNC Turned Shaft Pins',
-      process_type: 'CNC Machining',
-      quantity: 500,
-      completed_quantity: 350,
-      status: 'in_progress',
-      expected_delivery_date: '2026-08-05',
-      created_at: '2026-07-25',
-      notes: 'Harden surface to 45 HRC before final grind',
-    },
-    {
-      id: 2,
-      job_order_number: 'JO-2026-002',
-      vendor_name: 'Sri Krishna Heat Treatments',
-      item_name: 'Helical Gears 42CrMo4',
-      process_type: 'Case Hardening',
-      quantity: 250,
-      completed_quantity: 250,
-      status: 'completed',
-      expected_delivery_date: '2026-07-28',
-      created_at: '2026-07-20',
-      notes: 'Inspection cert required upon delivery',
-    },
-    {
-      id: 3,
-      job_order_number: 'JO-2026-003',
-      vendor_name: 'Vanguard Anodizers',
-      item_name: 'Enclosure Panels Type A',
-      process_type: 'Black Anodizing',
-      quantity: 1200,
-      completed_quantity: 0,
-      status: 'pending',
-      expected_delivery_date: '2026-08-12',
-      created_at: '2026-07-28',
-      notes: '15 Micron anodize depth',
-    },
-    {
-      id: 4,
-      job_order_number: 'JO-2026-004',
-      vendor_name: 'Lakshmi Tooling Solutions',
-      item_name: 'Press Brake Dies 12mm',
-      process_type: 'Wire EDM Coating',
-      quantity: 40,
-      completed_quantity: 20,
-      status: 'in_progress',
-      expected_delivery_date: '2026-08-02',
-      created_at: '2026-07-22',
-      notes: 'High tolerance ±0.01mm',
-    },
-  ]);
+  const [jobOrders, setJobOrders] = useState<JobOrder[]>([]);
 
   useEffect(() => {
     fetchJobOrders();
   }, []);
 
   const fetchJobOrders = async () => {
+    setLoading(true);
     try {
-      const cached = localStorage.getItem('workspace_id');
-      const workspaceId = cached ? Number(cached) : null;
+      let workspaceId = localStorage.getItem('workspace_id');
       if (!workspaceId) {
-        setLoading(false);
+        const res = await apiClient.post('/workspaces/list');
+        const list = res.data?.data;
+        if (Array.isArray(list) && list.length > 0) {
+          workspaceId = list[0].id;
+          localStorage.setItem('workspace_id', String(workspaceId));
+        }
+      }
+
+      if (!workspaceId) {
+        setJobOrders([]);
         return;
       }
-      const res = await apiClient.post('/job-orders/list', { workspace_id: workspaceId });
+
+      const res = await apiClient.post('/job-orders/list', { workspace_id: Number(workspaceId) });
       const list = res.data?.data;
       if (Array.isArray(list)) {
         setJobOrders(list);
+      } else {
+        setJobOrders([]);
       }
     } catch (e) {
       console.log('Failed to fetch job orders', e);
+      setJobOrders([]);
     } finally {
       setLoading(false);
     }
