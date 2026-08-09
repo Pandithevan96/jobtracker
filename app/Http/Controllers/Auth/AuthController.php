@@ -20,6 +20,11 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         try {
+            // Ensure JSON body is merged for php artisan serve / CLI environments
+            if ($request->isJson() && empty($request->all())) {
+                $request->merge((array) $request->json()->all());
+            }
+
             $validation = Validator::make($request->all(), [
                 'name'     => 'required|string|max:255',
                 'email'    => 'required|string|email|unique:users,email',
@@ -85,6 +90,11 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         try {
+            // Ensure JSON body is merged for php artisan serve / CLI environments
+            if ($request->isJson() && empty($request->all())) {
+                $request->merge((array) $request->json()->all());
+            }
+
             $validation = Validator::make($request->all(), [
                 'email'    => 'required|string|email',
                 'password' => 'required|string',
