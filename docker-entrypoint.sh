@@ -5,14 +5,13 @@ set -e
 php artisan config:clear || true
 php artisan cache:clear || true
 
-# Generate Passport encryption keys if missing
-if [ ! -f storage/oauth-private.key ]; then
-    echo "Generating Passport encryption keys..."
-    php artisan passport:keys --force
-fi
+# Run database migrations (fresh tables if first deploy, safe incremental otherwise)
+php artisan migrate --force
 
-# Ensure storage directory permissions
-chmod -R 777 storage/ bootstrap/cache/
+# Seed required lookup data (roles, modules, permissions) - idempotent
+php artisan db:seed --class="Database\Seeders\User\RoleSeeder" --force
+php artisan db:seed --class="Database\Seeders\User\ModuleSeeder" --force
+php artisan db:seed --class="Database\Seeders\User\RolePermissionSeeder" --force
 
 # Execute CMD process (php artisan serve)
 exec "$@"
