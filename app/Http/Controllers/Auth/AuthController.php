@@ -70,7 +70,11 @@ class AuthController extends Controller
                 'timestamp' => now()->toIso8601String(),
             ]), 201)->header('Content-Type', 'application/json');
         } catch (\Throwable $e) {
-            return response($e->getMessage(), 500)->header('Content-Type', 'text/plain');
+            return response()->json([
+                'status'  => 'error',
+                'message' => $e->getMessage(),
+                'code'    => '500',
+            ], 500);
         }
     }
 
