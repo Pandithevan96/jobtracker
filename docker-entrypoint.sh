@@ -5,13 +5,8 @@ set -e
 php artisan config:clear || true
 php artisan cache:clear || true
 
-# Run database migrations (fresh tables if first deploy, safe incremental otherwise)
+# Run database migrations
 php artisan migrate --force
-
-# Seed required lookup data (roles, modules, permissions) - idempotent
-php artisan db:seed --class="Database\Seeders\User\RoleSeeder" --force
-php artisan db:seed --class="Database\Seeders\User\ModuleSeeder" --force
-php artisan db:seed --class="Database\Seeders\User\RolePermissionSeeder" --force
 
 # Execute CMD process (php artisan serve)
 exec "$@"
