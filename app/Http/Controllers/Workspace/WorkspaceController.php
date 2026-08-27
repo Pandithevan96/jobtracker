@@ -116,9 +116,9 @@ class WorkspaceController extends Controller
     public function list(Request $request)
     {
         try {
-            // Check permission
+            // Check permission: allow view access if rolePermission is granted or missing (member scope below handles data isolation)
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_view) {
+            if ($rolePermission && (!$rolePermission->can_access || !$rolePermission->can_view)) {
                 return HelperFunction::response(null, null, 'You do not have permission to view workspaces', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
