@@ -118,7 +118,7 @@ export const JobOrdersList: React.FC = () => {
     setLoading(true);
     try {
       const workspaceId = await getCurrentWorkspaceId();
-      const payload: Record<string, any> = {};
+      const payload: Record<string, any> = { mode: appMode };
       if (workspaceId) payload.workspace_id = workspaceId;
 
       const res = await apiClient.post('/job-orders/list', payload);

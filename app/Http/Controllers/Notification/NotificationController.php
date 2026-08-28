@@ -76,14 +76,32 @@ class NotificationController extends Controller
                 })->first();
             }
 
-            if (!$workspace) {
-                return HelperFunction::response([], null, 'Notification logs fetched successfully', 'success', '000', Response::HTTP_OK);
+            // Vendor matching
+            $vendorRecords = Vendor::where('user_id', $user->id)
+                ->orWhere(function ($q) use ($user) {
+                    if ($user->email) $q->orWhere('email', $user->email);
+                    if ($user->phone) $q->orWhere('phone', $user->phone);
+                })->get();
+            $vendorIds = $vendorRecords->pluck('id')->toArray();
+
+            $isVendorMode = $request->input('mode') === 'vendor' ||
+                ($workspace && $workspace->owner_id !== $user->id);
+
+            $query = Notification::with(['jobOrder', 'vendor', 'user']);
+
+            if ($isVendorMode) {
+                $query->where(function ($q) use ($vendorIds, $user) {
+                    if (count($vendorIds) > 0) $q->whereIn('vendor_id', $vendorIds);
+                    if ($user->email) $q->orWhere('recipient_email', $user->email);
+                    if ($user->phone) $q->orWhere('recipient_number', $user->phone);
+                });
+            } else {
+                if (!$workspace) {
+                    return HelperFunction::response([], null, 'Notification logs fetched successfully', 'success', '000', Response::HTTP_OK);
+                }
+                $workspaceId = $workspace->id;
+                $query->where('workspace_id', $workspaceId);
             }
-
-            $workspaceId = $workspace->id;
-
-            $query = Notification::with(['jobOrder', 'vendor', 'user'])
-                ->where('workspace_id', $workspaceId);
 
             if ($user->isVendor()) {
                 $vendorIds = \App\Models\Vendor\Vendor::where('workspace_id', $workspaceId)
@@ -207,14 +225,31 @@ class NotificationController extends Controller
                 })->first();
             }
 
-            if (!$workspace) {
-                return HelperFunction::response(['count' => 0], null, 'Unread count fetched', 'success', '000', Response::HTTP_OK);
+            $vendorRecords = Vendor::where('user_id', $user->id)
+                ->orWhere(function ($q) use ($user) {
+                    if ($user->email) $q->orWhere('email', $user->email);
+                    if ($user->phone) $q->orWhere('phone', $user->phone);
+                })->get();
+            $vendorIds = $vendorRecords->pluck('id')->toArray();
+
+            $isVendorMode = $request->input('mode') === 'vendor' ||
+                ($workspace && $workspace->owner_id !== $user->id);
+
+            $query = Notification::where('created_at', '>=', now()->subDays(30));
+
+            if ($isVendorMode) {
+                $query->where(function ($q) use ($vendorIds, $user) {
+                    if (count($vendorIds) > 0) $q->whereIn('vendor_id', $vendorIds);
+                    if ($user->email) $q->orWhere('recipient_email', $user->email);
+                    if ($user->phone) $q->orWhere('recipient_number', $user->phone);
+                });
+            } else {
+                if (!$workspace) {
+                    return HelperFunction::response(['count' => 0], null, 'Unread count fetched', 'success', '000', Response::HTTP_OK);
+                }
+                $workspaceId = $workspace->id;
+                $query->where('workspace_id', $workspaceId);
             }
-
-            $workspaceId = $workspace->id;
-
-            $query = Notification::where('workspace_id', $workspaceId)
-                ->where('created_at', '>=', now()->subDays(30));
 
             if ($user->isVendor()) {
                 $vendorIds = \App\Models\Vendor\Vendor::where('workspace_id', $workspaceId)

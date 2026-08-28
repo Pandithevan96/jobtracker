@@ -168,40 +168,47 @@ class JobOrderController extends Controller
                 })->first();
             }
 
-            if (!$workspace) {
-                return HelperFunction::response([], null, 'Job Orders fetched successfully', 'success', '000', Response::HTTP_OK);
+            // Auto-resolve & link all vendor records matching $user by user_id, email, or phone
+            $vendorRecords = Vendor::where('user_id', $user->id)
+                ->orWhere(function ($q) use ($user) {
+                    if ($user->email) $q->orWhere('email', $user->email);
+                    if ($user->phone) $q->orWhere('phone', $user->phone);
+                })
+                ->get();
+
+            foreach ($vendorRecords as $vr) {
+                if (!$vr->user_id) {
+                    $vr->update(['user_id' => $user->id]);
+                }
+                Workspace::find($vr->workspace_id)?->members()->syncWithoutDetaching([
+                    $user->id => [
+                        'role'   => Workspace::MEMBER_ROLE_VENDOR,
+                        'status' => Workspace::MEMBER_STATUS_ACTIVE,
+                    ],
+                ]);
             }
 
-            $workspaceId = $workspace->id;
+            $vendorIds = $vendorRecords->pluck('id')->toArray();
+            $isVendorMode = $request->input('mode') === 'vendor' ||
+                ($workspace && $workspace->owner_id !== $user->id);
 
-            $query = JobOrder::with(['vendor', 'creator', 'workspace'])
-                ->where('workspace_id', $workspaceId);
+            $query = JobOrder::with(['vendor', 'creator', 'workspace']);
 
-            // ── Vendor scoping ──────────────────────────────────────────────
-            // A user may be a Principal in their OWN workspace but a Vendor
-            // MEMBER in this workspace.  Do NOT use $user->isVendor() (global
-            // role_id) — instead check the workspace_users pivot role so that
-            // dual-role users (Principal + Vendor) are handled correctly.
-            $isVendorOfThisWorkspace =
-                $workspace->owner_id !== $user->id          // not the owner
-                && $workspace->members()
-                    ->where('users.id', $user->id)
-                    ->wherePivot('role', Workspace::MEMBER_ROLE_VENDOR)
-                    ->exists();
-
-            if ($isVendorOfThisWorkspace) {
-                // Restrict to job orders whose vendor_id belongs to THIS user
-                $vendorIds = Vendor::where('workspace_id', $workspaceId)
-                    ->where('user_id', $user->id)
-                    ->pluck('id');
-                $query->whereIn('vendor_id', $vendorIds);
+            if ($isVendorMode) {
+                // In Vendor Mode: show all orders assigned to this vendor
+                $query->whereIn('vendor_id', count($vendorIds) > 0 ? $vendorIds : [-1]);
+            } else {
+                if (!$workspace) {
+                    return HelperFunction::response([], null, 'Job Orders fetched successfully', 'success', '000', Response::HTTP_OK);
+                }
+                $workspaceId = $workspace->id;
+                $query->where('workspace_id', $workspaceId);
             }
-            // ── End vendor scoping ──────────────────────────────────────────
 
             if ($request->filled('status')) {
                 $query->where('status', $request->input('status'));
             }
-            if ($request->filled('vendor_id') && !$isVendorOfThisWorkspace) {
+            if ($request->filled('vendor_id') && !$isVendorMode) {
                 $query->where('vendor_id', $request->input('vendor_id'));
             }
             if ($request->filled('priority')) {

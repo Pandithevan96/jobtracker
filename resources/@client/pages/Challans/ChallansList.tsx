@@ -65,7 +65,8 @@ export const ChallansList: React.FC = () => {
         }
       }
 
-      const payload: Record<string, any> = {};
+      const mode = localStorage.getItem('app_mode') ?? 'principal';
+      const payload: Record<string, any> = { mode: mode };
       if (workspaceId) payload.workspace_id = workspaceId;
 
       const res = await apiClient.post('/challans/list', payload);
