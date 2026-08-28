@@ -5,8 +5,8 @@ set -e
 php artisan config:clear || true
 php artisan cache:clear || true
 
-# Run fresh database migrations on startup
-php artisan migrate:fresh --force
+# Run database migrations
+php artisan migrate --force
 
 # Execute CMD process
 exec "$@"
