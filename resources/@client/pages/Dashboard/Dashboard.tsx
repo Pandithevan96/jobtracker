@@ -156,13 +156,11 @@ export const Dashboard: React.FC = () => {
         }
 
         try {
-            const mode = localStorage.getItem("app_mode") ?? "principal";
             const [joRes, dcRes, vRes] = await Promise.allSettled([
                 apiClient.post("/job-orders/list", {
                     workspace_id: workspaceId,
-                    mode: mode,
                 }),
-                apiClient.post("/challans/list", { workspace_id: workspaceId, mode: mode }),
+                apiClient.post("/challans/list", { workspace_id: workspaceId }),
                 apiClient.post("/vendors/list", { workspace_id: workspaceId }),
             ]);
 

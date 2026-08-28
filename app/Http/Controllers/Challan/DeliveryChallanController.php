@@ -268,33 +268,37 @@ class DeliveryChallanController extends Controller
                 })->first();
             }
 
-            // Auto-resolve vendor records for user
-            $vendorRecords = Vendor::where('user_id', $user->id)
-                ->orWhere(function ($q) use ($user) {
-                    if ($user->email) $q->orWhere('email', $user->email);
-                    if ($user->phone) $q->orWhere('phone', $user->phone);
-                })->get();
-            $vendorIds = $vendorRecords->pluck('id')->toArray();
+            if (!$workspace) {
+                return HelperFunction::response([], null, 'Delivery Challans fetched successfully', 'success', '000', Response::HTTP_OK);
+            }
 
-            $isVendorMode = $request->input('mode') === 'vendor' ||
-                ($workspace && $workspace->owner_id !== $user->id);
+            $workspaceId = $workspace->id;
+
+            $myVendorIds = Vendor::where('user_id', $user->id)
+                ->orWhere(function ($q) use ($user) {
+                    if ($user->email) $q->where('email', $user->email);
+                    if ($user->phone) $q->orWhere('phone', $user->phone);
+                })
+                ->pluck('id');
 
             $query = DeliveryChallan::with(['vendor', 'jobOrder', 'creator']);
 
-            if ($isVendorMode) {
-                $query->whereIn('vendor_id', count($vendorIds) > 0 ? $vendorIds : [-1]);
+            $isVendorMember = $workspace->owner_id !== $user->id;
+            if ($isVendorMember || $myVendorIds->isNotEmpty()) {
+                $query->where(function ($q) use ($workspaceId, $myVendorIds) {
+                    $q->where('workspace_id', $workspaceId);
+                    if ($myVendorIds->isNotEmpty()) {
+                        $q->orWhereIn('vendor_id', $myVendorIds);
+                    }
+                });
             } else {
-                if (!$workspace) {
-                    return HelperFunction::response([], null, 'Delivery Challans fetched successfully', 'success', '000', Response::HTTP_OK);
-                }
-                $workspaceId = $workspace->id;
                 $query->where('workspace_id', $workspaceId);
             }
 
             if ($request->filled('status')) {
                 $query->where('status', $request->input('status'));
             }
-            if ($request->filled('vendor_id') && !$isVendorMode) {
+            if ($request->filled('vendor_id')) {
                 $query->where('vendor_id', $request->input('vendor_id'));
             }
             if ($request->filled('type')) {
