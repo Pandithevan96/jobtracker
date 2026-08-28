@@ -79,11 +79,15 @@ const getCurrentWorkspaceId = async (): Promise<number | null> => {
     // In vendor mode, prefer the vendor workspace
     if (mode === "vendor") {
         const vendorWsId = localStorage.getItem("vendor_workspace_id");
-        if (vendorWsId) return Number(vendorWsId);
+        if (vendorWsId && vendorWsId !== "undefined" && vendorWsId !== "null" && !isNaN(Number(vendorWsId))) {
+            return Number(vendorWsId);
+        }
     }
 
     const cached = localStorage.getItem("workspace_id");
-    if (cached) return Number(cached);
+    if (cached && cached !== "undefined" && cached !== "null" && !isNaN(Number(cached))) {
+        return Number(cached);
+    }
 
     try {
         const res = await apiClient.post("/workspaces/list");

@@ -49,18 +49,26 @@ export const ChallansList: React.FC = () => {
 
   const fetchChallans = async () => {
     try {
-      let workspaceId = localStorage.getItem('workspace_id');
+      let workspaceIdRaw = localStorage.getItem('workspace_id');
+      let workspaceId: number | null =
+        workspaceIdRaw && workspaceIdRaw !== 'undefined' && workspaceIdRaw !== 'null'
+          ? Number(workspaceIdRaw)
+          : null;
+      if (workspaceId !== null && isNaN(workspaceId)) workspaceId = null;
+
       if (!workspaceId) {
         const wsRes = await apiClient.post('/workspaces/list');
         const list = wsRes.data?.data;
         if (Array.isArray(list) && list.length > 0) {
-          workspaceId = list[0].id;
+          workspaceId = Number(list[0].id);
           localStorage.setItem('workspace_id', String(workspaceId));
         }
       }
-      if (!workspaceId) return;
 
-      const res = await apiClient.post('/challans/list', { workspace_id: Number(workspaceId) });
+      const payload: Record<string, any> = {};
+      if (workspaceId) payload.workspace_id = workspaceId;
+
+      const res = await apiClient.post('/challans/list', payload);
       const list = res.data?.data;
       if (Array.isArray(list)) {
         setChallans(list);

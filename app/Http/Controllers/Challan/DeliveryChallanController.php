@@ -242,7 +242,7 @@ class DeliveryChallanController extends Controller
             }
 
             $validation = Validator::make($request->all(), [
-                'workspace_id' => 'required|integer|exists:workspaces,id',
+                'workspace_id' => 'nullable|integer|exists:workspaces,id',
                 'status'       => 'nullable|integer|in:1,2,3,4,5',
                 'vendor_id'    => 'nullable|integer',
                 'type'         => 'nullable|integer|in:1,2',
@@ -256,9 +256,22 @@ class DeliveryChallanController extends Controller
             $user = Auth::user();
             $workspaceId = $request->input('workspace_id');
 
-            $workspace = $this->resolveWorkspace($workspaceId, $user);
-            if (!$workspace) {
-                return HelperFunction::response(null, null, 'Workspace not found or you do not belong to it', 'error', '005', Response::HTTP_FORBIDDEN);
+            if (!$workspaceId) {
+                $workspace = Workspace::where(function ($q) use ($user) {
+                    $q->where('owner_id', $user->id)
+                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                })->first();
+
+                if ($workspace) {
+                    $workspaceId = $workspace->id;
+                } else {
+                    return HelperFunction::response([], null, 'Delivery Challans fetched successfully', 'success', '000', Response::HTTP_OK);
+                }
+            } else {
+                $workspace = $this->resolveWorkspace($workspaceId, $user);
+                if (!$workspace) {
+                    return HelperFunction::response(null, null, 'Workspace not found or you do not belong to it', 'error', '005', Response::HTTP_FORBIDDEN);
+                }
             }
 
             $query = DeliveryChallan::with(['vendor', 'jobOrder', 'creator'])

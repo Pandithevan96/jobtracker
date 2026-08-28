@@ -98,7 +98,25 @@ return new class extends Migration
             );
         }
 
-        // 2. Grant Vendor (role_id = 3) read access to Workspace Management (module_id = 2)
+        // 2. Ensure System Admin (role_id = 1) and Principal (role_id = 2) have full access to all 8 modules
+        foreach ([1, 2] as $roleId) {
+            for ($i = 1; $i <= 8; $i++) {
+                DB::table('role_permission')->updateOrInsert(
+                    ['role_id' => $roleId, 'module_id' => $i],
+                    [
+                        'can_access' => true,
+                        'can_view'   => true,
+                        'can_create' => true,
+                        'can_edit'   => true,
+                        'can_delete' => true,
+                        'updated_at' => $now,
+                        'created_at' => $now,
+                    ]
+                );
+            }
+        }
+
+        // 3. Grant Vendor (role_id = 3) read access to Workspace Management (module_id = 2)
         DB::table('role_permission')->updateOrInsert(
             ['role_id' => 3, 'module_id' => 2],
             [
@@ -112,7 +130,7 @@ return new class extends Migration
             ]
         );
 
-        // 3. Grant Vendor (role_id = 3) read access to Vendor Management (module_id = 3)
+        // 4. Grant Vendor (role_id = 3) read access to Vendor Management (module_id = 3)
         DB::table('role_permission')->updateOrInsert(
             ['role_id' => 3, 'module_id' => 3],
             [
@@ -126,7 +144,7 @@ return new class extends Migration
             ]
         );
 
-        // 4. Grant Vendor (role_id = 3) view/acknowledge access to Quality Rejections (module_id = 6)
+        // 5. Grant Vendor (role_id = 3) view/acknowledge access to Quality Rejections (module_id = 6)
         DB::table('role_permission')->updateOrInsert(
             ['role_id' => 3, 'module_id' => 6],
             [

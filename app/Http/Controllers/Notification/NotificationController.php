@@ -47,7 +47,7 @@ class NotificationController extends Controller
             }
 
             $validation = Validator::make($request->all(), [
-                'workspace_id' => 'required|integer|exists:workspaces,id',
+                'workspace_id' => 'nullable|integer|exists:workspaces,id',
                 'channel'      => 'nullable|integer|in:1,2,3,4',
                 'status'       => 'nullable|integer|in:1,2,3,4',
             ]);
@@ -59,16 +59,28 @@ class NotificationController extends Controller
             $user = Auth::user();
             $workspaceId = $request->input('workspace_id');
 
-            // Workspace scope
-            $workspace = Workspace::where('id', $workspaceId)
-                ->where(function ($q) use ($user) {
+            if (!$workspaceId) {
+                $workspace = Workspace::where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                      ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
-                })
-                ->first();
+                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                })->first();
 
-            if (!$workspace) {
-                return HelperFunction::response(null, null, 'Workspace not found or you do not belong to it', 'error', '005', Response::HTTP_FORBIDDEN);
+                if ($workspace) {
+                    $workspaceId = $workspace->id;
+                } else {
+                    return HelperFunction::response([], null, 'Notification logs fetched successfully', 'success', '000', Response::HTTP_OK);
+                }
+            } else {
+                $workspace = Workspace::where('id', $workspaceId)
+                    ->where(function ($q) use ($user) {
+                        $q->where('owner_id', $user->id)
+                            ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                    })
+                    ->first();
+
+                if (!$workspace) {
+                    return HelperFunction::response(null, null, 'Workspace not found or you do not belong to it', 'error', '005', Response::HTTP_FORBIDDEN);
+                }
             }
 
             $query = Notification::with(['jobOrder', 'vendor', 'user'])
@@ -169,7 +181,7 @@ class NotificationController extends Controller
     {
         try {
             $validation = Validator::make($request->all(), [
-                'workspace_id' => 'required|integer|exists:workspaces,id',
+                'workspace_id' => 'nullable|integer|exists:workspaces,id',
             ]);
 
             if ($validation->fails()) {
@@ -179,15 +191,28 @@ class NotificationController extends Controller
             $user = Auth::user();
             $workspaceId = $request->input('workspace_id');
 
-            $workspace = Workspace::where('id', $workspaceId)
-                ->where(function ($q) use ($user) {
+            if (!$workspaceId) {
+                $workspace = Workspace::where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                      ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
-                })
-                ->first();
+                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                })->first();
 
-            if (!$workspace) {
-                return HelperFunction::response(null, null, 'Workspace not found', 'error', '005', Response::HTTP_FORBIDDEN);
+                if ($workspace) {
+                    $workspaceId = $workspace->id;
+                } else {
+                    return HelperFunction::response(['count' => 0], null, 'Unread count fetched', 'success', '000', Response::HTTP_OK);
+                }
+            } else {
+                $workspace = Workspace::where('id', $workspaceId)
+                    ->where(function ($q) use ($user) {
+                        $q->where('owner_id', $user->id)
+                            ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                    })
+                    ->first();
+
+                if (!$workspace) {
+                    return HelperFunction::response(null, null, 'Workspace not found', 'error', '005', Response::HTTP_FORBIDDEN);
+                }
             }
 
             $query = Notification::where('workspace_id', $workspaceId)

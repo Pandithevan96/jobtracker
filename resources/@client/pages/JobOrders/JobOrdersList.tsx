@@ -61,27 +61,30 @@ export const JobOrdersList: React.FC = () => {
     try {
       const mode = localStorage.getItem('app_mode') ?? 'principal';
 
-      // In vendor mode prefer the vendor workspace
-      let workspaceId: string | null =
+      let workspaceIdRaw =
         mode === 'vendor'
           ? (localStorage.getItem('vendor_workspace_id') ?? localStorage.getItem('workspace_id'))
           : localStorage.getItem('workspace_id');
+
+      let workspaceId: number | null =
+        workspaceIdRaw && workspaceIdRaw !== 'undefined' && workspaceIdRaw !== 'null'
+          ? Number(workspaceIdRaw)
+          : null;
+      if (workspaceId !== null && isNaN(workspaceId)) workspaceId = null;
 
       if (!workspaceId) {
         const res = await apiClient.post('/workspaces/list');
         const list = res.data?.data;
         if (Array.isArray(list) && list.length > 0) {
-          workspaceId = list[0].id;
+          workspaceId = Number(list[0].id);
           localStorage.setItem('workspace_id', String(workspaceId));
         }
       }
 
-      if (!workspaceId) {
-        setJobOrders([]);
-        return;
-      }
+      const payload: Record<string, any> = {};
+      if (workspaceId) payload.workspace_id = workspaceId;
 
-      const res = await apiClient.post('/job-orders/list', { workspace_id: Number(workspaceId) });
+      const res = await apiClient.post('/job-orders/list', payload);
       const list = res.data?.data;
       if (Array.isArray(list)) {
         setJobOrders(list);

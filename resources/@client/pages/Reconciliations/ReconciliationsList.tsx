@@ -71,7 +71,17 @@ export const ReconciliationsList: React.FC = () => {
 
   const fetchReconciliations = async () => {
     try {
-      const res = await apiClient.post('/reconciliations/list');
+      let workspaceIdRaw = localStorage.getItem('workspace_id');
+      let workspaceId: number | null =
+        workspaceIdRaw && workspaceIdRaw !== 'undefined' && workspaceIdRaw !== 'null'
+          ? Number(workspaceIdRaw)
+          : null;
+      if (workspaceId !== null && isNaN(workspaceId)) workspaceId = null;
+
+      const payload: Record<string, any> = {};
+      if (workspaceId) payload.workspace_id = workspaceId;
+
+      const res = await apiClient.post('/reconciliations/list', payload);
       if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) {
         setReconciliations(res.data.data);
       }
