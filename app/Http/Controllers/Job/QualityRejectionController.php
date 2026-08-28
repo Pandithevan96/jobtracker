@@ -141,10 +141,30 @@ class QualityRejectionController extends Controller
 
             $workspaceId = $workspace->id;
 
-            $query = QualityRejection::with(['jobOrder', 'reporter'])
-                ->whereHas('jobOrder', function ($q) use ($workspaceId) {
+            $mode = $request->input('mode') ?? $request->header('X-App-Mode') ?? 'principal';
+
+            $myVendorIds = Vendor::where('user_id', $user->id)
+                ->orWhere(function ($q) use ($user) {
+                    if ($user->email) $q->where('email', $user->email);
+                    if ($user->phone) $q->orWhere('phone', $user->phone);
+                })
+                ->pluck('id');
+
+            $query = QualityRejection::with(['jobOrder', 'reporter']);
+
+            if ($mode === 'vendor') {
+                if ($myVendorIds->isNotEmpty()) {
+                    $query->whereHas('jobOrder', function ($q) use ($myVendorIds) {
+                        $q->whereIn('vendor_id', $myVendorIds);
+                    });
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+            } else {
+                $query->whereHas('jobOrder', function ($q) use ($workspaceId) {
                     $q->where('workspace_id', $workspaceId);
                 });
+            }
 
             if ($request->filled('status')) {
                 $query->where('status', $request->input('status'));

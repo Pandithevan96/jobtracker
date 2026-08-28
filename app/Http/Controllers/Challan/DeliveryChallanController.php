@@ -283,15 +283,17 @@ class DeliveryChallanController extends Controller
 
             $query = DeliveryChallan::with(['vendor', 'jobOrder', 'creator']);
 
-            $isVendorMember = $workspace->owner_id !== $user->id;
-            if ($isVendorMember || $myVendorIds->isNotEmpty()) {
-                $query->where(function ($q) use ($workspaceId, $myVendorIds) {
-                    $q->where('workspace_id', $workspaceId);
-                    if ($myVendorIds->isNotEmpty()) {
-                        $q->orWhereIn('vendor_id', $myVendorIds);
-                    }
-                });
+            $mode = $request->input('mode') ?? $request->header('X-App-Mode') ?? 'principal';
+
+            if ($mode === 'vendor') {
+                // Vendor mode: show ONLY delivery challans RECEIVED by this vendor
+                if ($myVendorIds->isNotEmpty()) {
+                    $query->whereIn('vendor_id', $myVendorIds);
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
             } else {
+                // Principal mode: show ONLY delivery challans ISSUED by this principal workspace
                 $query->where('workspace_id', $workspaceId);
             }
 

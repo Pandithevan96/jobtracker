@@ -163,10 +163,30 @@ class MaterialReconciliationController extends Controller
 
             $workspaceId = $workspace->id;
 
-            $query = MaterialReconciliation::with(['jobOrder', 'reconciler'])
-                ->whereHas('jobOrder', function ($q) use ($workspaceId) {
+            $mode = $request->input('mode') ?? $request->header('X-App-Mode') ?? 'principal';
+
+            $myVendorIds = Vendor::where('user_id', $user->id)
+                ->orWhere(function ($q) use ($user) {
+                    if ($user->email) $q->where('email', $user->email);
+                    if ($user->phone) $q->orWhere('phone', $user->phone);
+                })
+                ->pluck('id');
+
+            $query = MaterialReconciliation::with(['jobOrder', 'reconciler']);
+
+            if ($mode === 'vendor') {
+                if ($myVendorIds->isNotEmpty()) {
+                    $query->whereHas('jobOrder', function ($q) use ($myVendorIds) {
+                        $q->whereIn('vendor_id', $myVendorIds);
+                    });
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+            } else {
+                $query->whereHas('jobOrder', function ($q) use ($workspaceId) {
                     $q->where('workspace_id', $workspaceId);
                 });
+            }
 
             if ($request->filled('is_balanced')) {
                 $query->where('is_balanced', $request->input('is_balanced'));

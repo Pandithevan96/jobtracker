@@ -32,10 +32,12 @@ export const apiClient = {
         customHeaders: Record<string, string> = {},
     ): Promise<{ data: T }> {
         const token = localStorage.getItem("auth_token");
+        const appMode = localStorage.getItem("app_mode") || "principal";
 
         const reqHeaders: Record<string, string> = {
             "Content-Type": "application/json",
             Accept: "application/json",
+            "X-App-Mode": appMode,
             ...customHeaders,
         };
 

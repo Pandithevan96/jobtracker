@@ -101,23 +101,28 @@ class NotificationController extends Controller
                 ->orWhere('created_by', $user->id)
                 ->pluck('id');
 
+            $mode = $request->input('mode') ?? $request->header('X-App-Mode') ?? 'principal';
+
             $query = Notification::with(['jobOrder', 'vendor', 'user']);
 
-            $query->where(function ($q) use ($workspaceId, $myVendorIds, $myJobOrderIds, $user) {
-                $q->where('workspace_id', $workspaceId);
-                if ($myVendorIds->isNotEmpty()) {
-                    $q->orWhereIn('vendor_id', $myVendorIds);
-                }
-                if ($myJobOrderIds->isNotEmpty()) {
-                    $q->orWhereIn('job_order_id', $myJobOrderIds);
-                }
-                if ($user->email) {
-                    $q->orWhere('recipient_email', $user->email);
-                }
-                if ($user->phone) {
-                    $q->orWhere('recipient_number', $user->phone);
-                }
-            });
+            if ($mode === 'vendor') {
+                $query->where(function ($q) use ($myVendorIds, $myJobOrderIds, $user) {
+                    if ($myVendorIds->isNotEmpty()) {
+                        $q->orWhereIn('vendor_id', $myVendorIds);
+                    }
+                    if ($myJobOrderIds->isNotEmpty()) {
+                        $q->orWhereIn('job_order_id', $myJobOrderIds);
+                    }
+                    if ($user->email) {
+                        $q->orWhere('recipient_email', $user->email);
+                    }
+                    if ($user->phone) {
+                        $q->orWhere('recipient_number', $user->phone);
+                    }
+                });
+            } else {
+                $query->where('workspace_id', $workspaceId);
+            }
 
             if ($request->filled('channel')) {
                 $query->where('channel', $request->input('channel'));
@@ -256,23 +261,28 @@ class NotificationController extends Controller
                 ->orWhere('created_by', $user->id)
                 ->pluck('id');
 
+            $mode = $request->input('mode') ?? $request->header('X-App-Mode') ?? 'principal';
+
             $query = Notification::where('created_at', '>=', now()->subDays(30));
 
-            $query->where(function ($q) use ($workspaceId, $myVendorIds, $myJobOrderIds, $user) {
-                $q->where('workspace_id', $workspaceId);
-                if ($myVendorIds->isNotEmpty()) {
-                    $q->orWhereIn('vendor_id', $myVendorIds);
-                }
-                if ($myJobOrderIds->isNotEmpty()) {
-                    $q->orWhereIn('job_order_id', $myJobOrderIds);
-                }
-                if ($user->email) {
-                    $q->orWhere('recipient_email', $user->email);
-                }
-                if ($user->phone) {
-                    $q->orWhere('recipient_number', $user->phone);
-                }
-            });
+            if ($mode === 'vendor') {
+                $query->where(function ($q) use ($myVendorIds, $myJobOrderIds, $user) {
+                    if ($myVendorIds->isNotEmpty()) {
+                        $q->orWhereIn('vendor_id', $myVendorIds);
+                    }
+                    if ($myJobOrderIds->isNotEmpty()) {
+                        $q->orWhereIn('job_order_id', $myJobOrderIds);
+                    }
+                    if ($user->email) {
+                        $q->orWhere('recipient_email', $user->email);
+                    }
+                    if ($user->phone) {
+                        $q->orWhere('recipient_number', $user->phone);
+                    }
+                });
+            } else {
+                $query->where('workspace_id', $workspaceId);
+            }
 
             $count = $query->count();
 

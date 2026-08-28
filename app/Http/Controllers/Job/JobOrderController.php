@@ -213,16 +213,18 @@ class JobOrderController extends Controller
                 })
                 ->pluck('id');
 
-            // If user is acting in Vendor mode or has vendor records:
-            $isVendorMember = $workspace->owner_id !== $user->id;
-            if ($isVendorMember || $myVendorIds->isNotEmpty()) {
-                $query->where(function ($q) use ($workspaceId, $myVendorIds) {
-                    $q->where('workspace_id', $workspaceId);
-                    if ($myVendorIds->isNotEmpty()) {
-                        $q->orWhereIn('vendor_id', $myVendorIds);
-                    }
-                });
+            // Determine mode (principal vs vendor)
+            $mode = $request->input('mode') ?? $request->header('X-App-Mode') ?? 'principal';
+
+            if ($mode === 'vendor') {
+                // Vendor mode: show ONLY job orders RECEIVED by this vendor
+                if ($myVendorIds->isNotEmpty()) {
+                    $query->whereIn('vendor_id', $myVendorIds);
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
             } else {
+                // Principal mode: show ONLY job orders ISSUED by this principal workspace
                 $query->where('workspace_id', $workspaceId);
             }
 
