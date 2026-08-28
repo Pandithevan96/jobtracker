@@ -5,82 +5,119 @@ import { useAuth } from '@/context/AuthContext';
 import {
   FileText,
   Search,
-  Filter,
   Plus,
   X,
   Building2,
   Calendar,
-  Layers,
   ChevronRight,
-  Clock,
-  CheckCircle2,
+  Loader2,
   AlertCircle
 } from 'lucide-react';
 
 export interface JobOrder {
   id: number;
-  job_order_number: string;
-  vendor_name: string;
+  order_number?: string;
+  job_order_number?: string;
+  vendor?: { id: number; shop_name: string };
+  vendor_name?: string;
   vendor_id?: number;
-  item_name: string;
-  process_type: string;
-  quantity: number;
+  part_name?: string;
+  item_name?: string;
+  process_type?: string;
+  quantity_sent?: number;
+  quantity?: number;
   completed_quantity?: number;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  expected_delivery_date: string;
-  created_at: string;
+  status: any;
+  due_date?: string;
+  expected_delivery_date?: string;
+  created_at?: string;
   notes?: string;
 }
 
 export const JobOrdersList: React.FC = () => {
   const { appMode } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(searchParams.get('action') === 'new');
 
+  const getTodayDate = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
   // Form State
   const [newOrder, setNewOrder] = useState({
-    vendor_name: '',
-    item_name: '',
+    vendor_id: '',
+    part_name: '',
+    part_number: '',
     process_type: 'Machining',
-    quantity: 100,
-    expected_delivery_date: '2026-08-10',
+    quantity_sent: 100,
+    due_date: getTodayDate(),
     notes: '',
   });
 
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([]);
+  const [vendors, setVendors] = useState<any[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchJobOrders();
+    fetchVendors();
   }, []);
 
-  const fetchJobOrders = async () => {
-    setLoading(true);
-    try {
-      const mode = localStorage.getItem('app_mode') ?? 'principal';
+  const getCurrentWorkspaceId = async (): Promise<number | null> => {
+    const mode = localStorage.getItem('app_mode') ?? 'principal';
+    let workspaceIdRaw =
+      mode === 'vendor'
+        ? (localStorage.getItem('vendor_workspace_id') ?? localStorage.getItem('workspace_id'))
+        : localStorage.getItem('workspace_id');
 
-      let workspaceIdRaw =
-        mode === 'vendor'
-          ? (localStorage.getItem('vendor_workspace_id') ?? localStorage.getItem('workspace_id'))
-          : localStorage.getItem('workspace_id');
+    let workspaceId: number | null =
+      workspaceIdRaw && workspaceIdRaw !== 'undefined' && workspaceIdRaw !== 'null'
+        ? Number(workspaceIdRaw)
+        : null;
+    if (workspaceId !== null && isNaN(workspaceId)) workspaceId = null;
 
-      let workspaceId: number | null =
-        workspaceIdRaw && workspaceIdRaw !== 'undefined' && workspaceIdRaw !== 'null'
-          ? Number(workspaceIdRaw)
-          : null;
-      if (workspaceId !== null && isNaN(workspaceId)) workspaceId = null;
-
-      if (!workspaceId) {
+    if (!workspaceId) {
+      try {
         const res = await apiClient.post('/workspaces/list');
         const list = res.data?.data;
         if (Array.isArray(list) && list.length > 0) {
           workspaceId = Number(list[0].id);
           localStorage.setItem('workspace_id', String(workspaceId));
         }
+      } catch (e) {
+        console.error('Failed to list workspaces', e);
       }
+    }
+    return workspaceId;
+  };
 
+  const fetchVendors = async () => {
+    try {
+      const workspaceId = await getCurrentWorkspaceId();
+      const payload: Record<string, any> = {};
+      if (workspaceId) payload.workspace_id = workspaceId;
+      const res = await apiClient.post('/vendors/list', payload);
+      const list = res.data?.data;
+      if (Array.isArray(list)) {
+        setVendors(list);
+        if (list.length > 0) {
+          setNewOrder((prev) => ({ ...prev, vendor_id: prev.vendor_id || String(list[0].id) }));
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch vendors', e);
+    }
+  };
+
+  const fetchJobOrders = async () => {
+    setLoading(true);
+    try {
+      const workspaceId = await getCurrentWorkspaceId();
       const payload: Record<string, any> = {};
       if (workspaceId) payload.workspace_id = workspaceId;
 
@@ -101,38 +138,54 @@ export const JobOrdersList: React.FC = () => {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newOrder.vendor_name || !newOrder.item_name) return;
+    setCreateError(null);
 
-    try {
-      await apiClient.post('/job-orders/create', newOrder);
-    } catch (e) {
-      console.log('Created job order locally');
+    if (!newOrder.vendor_id) {
+      setCreateError('Please select a vendor.');
+      return;
+    }
+    if (!newOrder.part_name.trim()) {
+      setCreateError('Part Name / Description is required.');
+      return;
     }
 
-    const createdItem: JobOrder = {
-      id: Date.now(),
-      job_order_number: `JO-2026-0${jobOrders.length + 1}`,
-      vendor_name: newOrder.vendor_name,
-      item_name: newOrder.item_name,
-      process_type: newOrder.process_type,
-      quantity: Number(newOrder.quantity),
-      completed_quantity: 0,
-      status: 'pending',
-      expected_delivery_date: newOrder.expected_delivery_date,
-      created_at: new Date().toISOString().split('T')[0],
-      notes: newOrder.notes,
-    };
+    setCreating(true);
+    try {
+      const workspaceId = await getCurrentWorkspaceId();
+      const payload: Record<string, any> = {
+        vendor_id: Number(newOrder.vendor_id),
+        part_name: newOrder.part_name.trim(),
+        part_number: newOrder.part_number.trim(),
+        process_type: newOrder.process_type,
+        quantity_sent: Number(newOrder.quantity_sent),
+        due_date: newOrder.due_date,
+        notes: newOrder.notes.trim(),
+      };
+      if (workspaceId) payload.workspace_id = workspaceId;
 
-    setJobOrders([createdItem, ...jobOrders]);
-    setShowCreateModal(false);
-    setNewOrder({
-      vendor_name: '',
-      item_name: '',
-      process_type: 'Machining',
-      quantity: 100,
-      expected_delivery_date: '2026-08-10',
-      notes: '',
-    });
+      const res = await apiClient.post('/job-orders/create', payload);
+
+      if (res.data?.status === 'error') {
+        setCreateError(res.data.message || 'Failed to create job order');
+        return;
+      }
+
+      setShowCreateModal(false);
+      setNewOrder({
+        vendor_id: vendors.length > 0 ? String(vendors[0].id) : '',
+        part_name: '',
+        part_number: '',
+        process_type: 'Machining',
+        quantity_sent: 100,
+        due_date: getTodayDate(),
+        notes: '',
+      });
+      await fetchJobOrders();
+    } catch (e: any) {
+      setCreateError(e?.response?.data?.message || e?.message || 'Failed to create job order');
+    } finally {
+      setCreating(false);
+    }
   };
 
   const filteredOrders = jobOrders.filter((order: any) => {
@@ -183,13 +236,15 @@ export const JobOrdersList: React.FC = () => {
           <p className="text-xs text-[#888] mt-1">Track subcontract work orders dispatched to vendors</p>
         </div>
 
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="bg-[#f5a623] hover:bg-[#e0951c] text-black font-bold text-xs px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 border-none cursor-pointer self-start sm:self-auto"
-        >
-          <Plus size={16} />
-          <span>New Job Order</span>
-        </button>
+        {appMode === 'principal' && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-[#f5a623] hover:bg-[#e0951c] text-black font-bold text-xs px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 border-none cursor-pointer self-start sm:self-auto"
+          >
+            <Plus size={16} />
+            <span>New Job Order</span>
+          </button>
+        )}
       </div>
 
       {/* Filters & Search */}
@@ -222,76 +277,86 @@ export const JobOrdersList: React.FC = () => {
         </div>
       </div>
 
+      {/* Loading state */}
+      {loading && (
+        <div className="flex items-center justify-center gap-2 text-[#888] text-xs py-16 bg-[#141414] border border-[#262626] rounded-2xl">
+          <Loader2 size={16} className="animate-spin" />
+          Loading job orders...
+        </div>
+      )}
+
       {/* Job Orders List Table */}
-      <div className="bg-[#141414] border border-[#262626] rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-[#262626] text-[11px] uppercase tracking-wider text-[#777] bg-[#111]">
-                <th className="py-3 px-4">Job Order #</th>
-                <th className="py-3 px-4">{appMode === 'vendor' ? 'Principal / Sender' : 'Vendor'}</th>
-                <th className="py-3 px-4">Process / Item</th>
-                <th className="py-3 px-4 text-center">Quantity</th>
-                <th className="py-3 px-4">Expected Date</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#222] text-xs">
-              {filteredOrders.length > 0 ? (
-                filteredOrders.map((order: any) => (
-                  <tr key={order.id} className="hover:bg-[#1a1a1a] transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-amber-400">
-                      <Link to={`/job-orders`} className="no-underline text-amber-400 hover:underline">
-                        {order.job_order_number || order.order_number || `#${order.id}`}
-                      </Link>
-                    </td>
-                    <td className="py-3.5 px-4 font-semibold text-gray-200">
-                      <div className="flex items-center gap-1.5">
-                        <Building2 size={14} className="text-[#666]" />
-                        <span>
-                          {appMode === 'vendor'
-                            ? (order.workspace?.name || order.creator?.name || '—')
-                            : (order.vendor?.shop_name || order.vendor_name || '—')}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="font-semibold text-white">{order.part_name || order.item_name || '—'}</div>
-                      <div className="text-[11px] text-[#888]">{order.process_type || '—'}</div>
-                    </td>
-                    <td className="py-3.5 px-4 text-center font-mono font-bold">
-                      <span className="text-white">{order.completed_quantity || 0}</span>
-                      <span className="text-[#666]"> / {order.quantity_sent || order.quantity || 0}</span>
-                    </td>
-                    <td className="py-3.5 px-4 text-[#aaa] font-mono">
-                      <div className="flex items-center gap-1">
-                        <Calendar size={13} className="text-[#666]" />
-                        <span>{order.due_date ? String(order.due_date).split('T')[0] : (order.expected_delivery_date || '—')}</span>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4">{getStatusBadge(order.status)}</td>
-                    <td className="py-3.5 px-4 text-right">
-                      <Link
-                        to={`/job-orders/${order.id}`}
-                        className="inline-flex items-center gap-1 bg-[#222] hover:bg-[#2e2e2e] text-white px-3 py-1.5 rounded-lg text-xs font-semibold no-underline border border-[#333] transition-colors"
-                      >
-                        Details <ChevronRight size={14} />
-                      </Link>
+      {!loading && (
+        <div className="bg-[#141414] border border-[#262626] rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-[#262626] text-[11px] uppercase tracking-wider text-[#777] bg-[#111]">
+                  <th className="py-3 px-4">Job Order #</th>
+                  <th className="py-3 px-4">{appMode === 'vendor' ? 'Principal / Sender' : 'Vendor'}</th>
+                  <th className="py-3 px-4">Process / Item</th>
+                  <th className="py-3 px-4 text-center">Quantity</th>
+                  <th className="py-3 px-4">Due Date</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#222] text-xs">
+                {filteredOrders.length > 0 ? (
+                  filteredOrders.map((order: any) => (
+                    <tr key={order.id} className="hover:bg-[#1a1a1a] transition-colors">
+                      <td className="py-3.5 px-4 font-mono font-bold text-amber-400">
+                        <Link to={`/job-orders/${order.id}`} className="no-underline text-amber-400 hover:underline">
+                          {order.job_order_number || order.order_number || `#${order.id}`}
+                        </Link>
+                      </td>
+                      <td className="py-3.5 px-4 font-semibold text-gray-200">
+                        <div className="flex items-center gap-1.5">
+                          <Building2 size={14} className="text-[#666]" />
+                          <span>
+                            {appMode === 'vendor'
+                              ? (order.workspace?.name || order.creator?.name || '—')
+                              : (order.vendor?.shop_name || order.vendor_name || '—')}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-semibold text-white">{order.part_name || order.item_name || '—'}</div>
+                        <div className="text-[11px] text-[#888]">{order.process_type || '—'}</div>
+                      </td>
+                      <td className="py-3.5 px-4 text-center font-mono font-bold">
+                        <span className="text-white">{order.completed_quantity || 0}</span>
+                        <span className="text-[#666]"> / {order.quantity_sent || order.quantity || 0}</span>
+                      </td>
+                      <td className="py-3.5 px-4 text-[#aaa] font-mono">
+                        <div className="flex items-center gap-1">
+                          <Calendar size={13} className="text-[#666]" />
+                          <span>{order.due_date ? String(order.due_date).split('T')[0] : (order.expected_delivery_date || '—')}</span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4">{getStatusBadge(order.status)}</td>
+                      <td className="py-3.5 px-4 text-right">
+                        <Link
+                          to={`/job-orders/${order.id}`}
+                          className="inline-flex items-center gap-1 bg-[#222] hover:bg-[#2e2e2e] text-white px-3 py-1.5 rounded-lg text-xs font-semibold no-underline border border-[#333] transition-colors"
+                        >
+                          Details <ChevronRight size={14} />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-[#777]">
+                      No job orders found.
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-[#777]">
-                    No job orders found matching your search.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Create Modal */}
       {showCreateModal && (
@@ -307,27 +372,59 @@ export const JobOrdersList: React.FC = () => {
             <h2 className="text-lg font-bold text-white mb-1">Create Job Order</h2>
             <p className="text-xs text-[#888] mb-4">Issue a new subcontract job order to a vendor</p>
 
+            {createError && (
+              <div className="mb-4 flex items-center gap-2 text-xs text-red-300 bg-[#2a1414] border border-[#3a1f1f] rounded-xl px-3 py-2">
+                <AlertCircle size={14} />
+                {createError}
+              </div>
+            )}
+
             <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
               <div>
-                <label className="block text-[#aaa] font-semibold mb-1">Vendor Name</label>
+                <label className="block text-[#aaa] font-semibold mb-1">Target Vendor *</label>
+                {vendors.length > 0 ? (
+                  <select
+                    value={newOrder.vendor_id}
+                    onChange={(e) => setNewOrder({ ...newOrder, vendor_id: e.target.value })}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-white px-3.5 py-2.5 focus:outline-none focus:border-[#f5a623]"
+                    required
+                  >
+                    <option value="">Select Vendor...</option>
+                    {vendors.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.shop_name} {v.city ? `(${v.city})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="text-amber-400 bg-amber-500/10 border border-amber-500/30 p-3 rounded-xl">
+                    No vendors registered in workspace.{' '}
+                    <Link to="/vendors" className="underline font-bold text-white">
+                      Add a vendor first
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[#aaa] font-semibold mb-1">Part Name / Item Description *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Apex Precision Engineering"
-                  value={newOrder.vendor_name}
-                  onChange={(e) => setNewOrder({ ...newOrder, vendor_name: e.target.value })}
+                  placeholder="e.g. Camshaft Housing M12"
+                  value={newOrder.part_name}
+                  onChange={(e) => setNewOrder({ ...newOrder, part_name: e.target.value })}
                   className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-white px-3.5 py-2.5 focus:outline-none focus:border-[#f5a623]"
                 />
               </div>
 
               <div>
-                <label className="block text-[#aaa] font-semibold mb-1">Item Description</label>
+                <label className="block text-[#aaa] font-semibold mb-1">Part Number</label>
                 <input
                   type="text"
-                  required
-                  placeholder="e.g. CNC Turned Pins M12"
-                  value={newOrder.item_name}
-                  onChange={(e) => setNewOrder({ ...newOrder, item_name: e.target.value })}
+                  placeholder="e.g. CSH-2026-001"
+                  value={newOrder.part_number}
+                  onChange={(e) => setNewOrder({ ...newOrder, part_number: e.target.value })}
                   className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-white px-3.5 py-2.5 focus:outline-none focus:border-[#f5a623]"
                 />
               </div>
@@ -344,28 +441,30 @@ export const JobOrdersList: React.FC = () => {
                     <option value="Heat Treatment">Heat Treatment</option>
                     <option value="Anodizing">Anodizing / Coating</option>
                     <option value="Grinding">Precision Grinding</option>
+                    <option value="Turning">Turning</option>
+                    <option value="Assembly">Assembly</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[#aaa] font-semibold mb-1">Quantity</label>
+                  <label className="block text-[#aaa] font-semibold mb-1">Quantity Sent *</label>
                   <input
                     type="number"
                     required
                     min={1}
-                    value={newOrder.quantity}
-                    onChange={(e) => setNewOrder({ ...newOrder, quantity: Number(e.target.value) })}
+                    value={newOrder.quantity_sent}
+                    onChange={(e) => setNewOrder({ ...newOrder, quantity_sent: Number(e.target.value) })}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-white px-3.5 py-2.5 focus:outline-none focus:border-[#f5a623]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[#aaa] font-semibold mb-1">Expected Delivery Date</label>
+                <label className="block text-[#aaa] font-semibold mb-1">Due Date *</label>
                 <input
                   type="date"
                   required
-                  value={newOrder.expected_delivery_date}
-                  onChange={(e) => setNewOrder({ ...newOrder, expected_delivery_date: e.target.value })}
+                  value={newOrder.due_date}
+                  onChange={(e) => setNewOrder({ ...newOrder, due_date: e.target.value })}
                   className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-white px-3.5 py-2.5 focus:outline-none focus:border-[#f5a623]"
                 />
               </div>
@@ -386,14 +485,16 @@ export const JobOrdersList: React.FC = () => {
                   type="button"
                   onClick={() => setShowCreateModal(false)}
                   className="flex-1 bg-[#222] hover:bg-[#2a2a2a] text-[#aaa] font-bold py-3 rounded-xl border-none cursor-pointer"
+                  disabled={creating}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-[#f5a623] hover:bg-[#e0951c] text-black font-bold py-3 rounded-xl border-none cursor-pointer"
+                  disabled={creating || vendors.length === 0}
+                  className="flex-1 bg-[#f5a623] hover:bg-[#e0951c] text-black font-bold py-3 rounded-xl border-none cursor-pointer disabled:opacity-60"
                 >
-                  Issue Job Order
+                  {creating ? 'Saving...' : 'Issue Job Order'}
                 </button>
               </div>
             </form>

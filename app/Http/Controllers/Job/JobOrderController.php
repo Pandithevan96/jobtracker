@@ -29,6 +29,30 @@ class JobOrderController extends Controller
                 return HelperFunction::response(null, null, 'You do not have permission to create job orders', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
+            $user = Auth::user();
+
+            // Field aliases mapping
+            if (!$request->has('part_name') && $request->has('item_name')) {
+                $request->merge(['part_name' => $request->input('item_name')]);
+            }
+            if (!$request->has('quantity_sent') && $request->has('quantity')) {
+                $request->merge(['quantity_sent' => $request->input('quantity')]);
+            }
+            if (!$request->has('due_date') && $request->has('expected_delivery_date')) {
+                $request->merge(['due_date' => $request->input('expected_delivery_date')]);
+            }
+
+            // Auto-resolve workspace_id if omitted
+            if (!$request->filled('workspace_id')) {
+                $workspace = Workspace::where(function ($q) use ($user) {
+                    $q->where('owner_id', $user->id)
+                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                })->first();
+                if ($workspace) {
+                    $request->merge(['workspace_id' => $workspace->id]);
+                }
+            }
+
             $validation = Validator::make($request->all(), [
                 'workspace_id'  => 'required|integer|exists:workspaces,id',
                 'vendor_id'     => 'required|integer|exists:vendors,id',
@@ -38,7 +62,7 @@ class JobOrderController extends Controller
                 'process_type'  => 'nullable|string|max:100',
                 'quantity_sent' => 'required|numeric|min:0.01',
                 'uom'           => 'nullable|string|max:20',
-                'due_date'      => 'required|date|after_or_equal:today',
+                'due_date'      => 'required|date',
                 'status'        => 'nullable|integer|in:1,2',
                 'priority'      => 'nullable|integer|in:1,2,3,4',
                 'notes'         => 'nullable|string',
@@ -48,7 +72,6 @@ class JobOrderController extends Controller
                 return HelperFunction::response(null, null, $validation->errors()->first(), 'error', '001', Response::HTTP_BAD_REQUEST);
             }
 
-            $user = Auth::user();
             $workspaceId = $request->input('workspace_id');
 
             $workspace = Workspace::where('id', $workspaceId)
