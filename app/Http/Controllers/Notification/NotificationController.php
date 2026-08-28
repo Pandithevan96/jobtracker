@@ -59,59 +59,39 @@ class NotificationController extends Controller
             $user = Auth::user();
             $workspaceId = $request->input('workspace_id');
 
+            // Auto-link vendor records and sync workspace memberships
+            $myVendorIds = \App\Models\Vendor\Vendor::syncUserVendors($user);
+
             $workspace = null;
             if ($workspaceId) {
-                $workspace = Workspace::where('id', $workspaceId)
-                    ->where(function ($q) use ($user) {
-                        $q->where('owner_id', $user->id)
-                            ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
-                    })
+                $workspace = Workspace::find($workspaceId);
+            }
+            if (!$workspace) {
+                $workspace = Workspace::where('owner_id', $user->id)
+                    ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id))
                     ->first();
             }
 
-            if (!$workspace) {
-                $workspace = Workspace::where(function ($q) use ($user) {
-                    $q->where('owner_id', $user->id)
-                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
-                })->first();
-            }
-
-            if (!$workspace) {
-                return HelperFunction::response([], null, 'Notification logs fetched successfully', 'success', '000', Response::HTTP_OK);
-            }
-
-            $workspaceId = $workspace->id;
-
-            // Auto-link vendor records matching user's workspace names
-            $myWorkspaceNames = Workspace::where('owner_id', $user->id)->pluck('name')->toArray();
-            if (!empty($myWorkspaceNames)) {
-                \App\Models\Vendor\Vendor::whereIn('shop_name', $myWorkspaceNames)
-                    ->whereNull('user_id')
-                    ->update(['user_id' => $user->id]);
-            }
-
-            $myVendorIds = \App\Models\Vendor\Vendor::where('user_id', $user->id)
-                ->orWhere(function ($q) use ($user) {
-                    if ($user->email) $q->where('email', $user->email);
-                    if ($user->phone) $q->orWhere('phone', $user->phone);
-                })
-                ->pluck('id');
+            $resolvedWsId = $workspace ? $workspace->id : $workspaceId;
 
             $myJobOrderIds = \App\Models\Job\JobOrder::whereIn('vendor_id', $myVendorIds)
                 ->orWhere('created_by', $user->id)
-                ->pluck('id');
+                ->pluck('id')
+                ->toArray();
 
             $mode = $request->input('mode') ?? $request->header('X-App-Mode') ?? 'principal';
 
             $query = Notification::with(['jobOrder', 'vendor', 'user']);
 
             if ($mode === 'vendor') {
-                $query->where(function ($q) use ($workspaceId, $myVendorIds, $myJobOrderIds, $user) {
-                    $q->where('workspace_id', $workspaceId);
-                    if ($myVendorIds->isNotEmpty()) {
+                $query->where(function ($q) use ($resolvedWsId, $myVendorIds, $myJobOrderIds, $user) {
+                    if ($resolvedWsId) {
+                        $q->where('workspace_id', $resolvedWsId);
+                    }
+                    if (!empty($myVendorIds)) {
                         $q->orWhereIn('vendor_id', $myVendorIds);
                     }
-                    if ($myJobOrderIds->isNotEmpty()) {
+                    if (!empty($myJobOrderIds)) {
                         $q->orWhereIn('job_order_id', $myJobOrderIds);
                     }
                     if ($user->email) {
@@ -122,7 +102,7 @@ class NotificationController extends Controller
                     }
                 });
             } else {
-                $query->where('workspace_id', $workspaceId);
+                $query->where('workspace_id', $resolvedWsId);
             }
 
             if ($request->filled('channel')) {
@@ -220,59 +200,39 @@ class NotificationController extends Controller
             $user = Auth::user();
             $workspaceId = $request->input('workspace_id');
 
+            // Auto-link vendor records and sync workspace memberships
+            $myVendorIds = \App\Models\Vendor\Vendor::syncUserVendors($user);
+
             $workspace = null;
             if ($workspaceId) {
-                $workspace = Workspace::where('id', $workspaceId)
-                    ->where(function ($q) use ($user) {
-                        $q->where('owner_id', $user->id)
-                            ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
-                    })
+                $workspace = Workspace::find($workspaceId);
+            }
+            if (!$workspace) {
+                $workspace = Workspace::where('owner_id', $user->id)
+                    ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id))
                     ->first();
             }
 
-            if (!$workspace) {
-                $workspace = Workspace::where(function ($q) use ($user) {
-                    $q->where('owner_id', $user->id)
-                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
-                })->first();
-            }
-
-            if (!$workspace) {
-                return HelperFunction::response(['count' => 0], null, 'Unread count fetched', 'success', '000', Response::HTTP_OK);
-            }
-
-            $workspaceId = $workspace->id;
-
-            // Auto-link vendor records matching user's workspace names
-            $myWorkspaceNames = Workspace::where('owner_id', $user->id)->pluck('name')->toArray();
-            if (!empty($myWorkspaceNames)) {
-                \App\Models\Vendor\Vendor::whereIn('shop_name', $myWorkspaceNames)
-                    ->whereNull('user_id')
-                    ->update(['user_id' => $user->id]);
-            }
-
-            $myVendorIds = \App\Models\Vendor\Vendor::where('user_id', $user->id)
-                ->orWhere(function ($q) use ($user) {
-                    if ($user->email) $q->where('email', $user->email);
-                    if ($user->phone) $q->orWhere('phone', $user->phone);
-                })
-                ->pluck('id');
+            $resolvedWsId = $workspace ? $workspace->id : $workspaceId;
 
             $myJobOrderIds = \App\Models\Job\JobOrder::whereIn('vendor_id', $myVendorIds)
                 ->orWhere('created_by', $user->id)
-                ->pluck('id');
+                ->pluck('id')
+                ->toArray();
 
             $mode = $request->input('mode') ?? $request->header('X-App-Mode') ?? 'principal';
 
             $query = Notification::where('created_at', '>=', now()->subDays(30));
 
             if ($mode === 'vendor') {
-                $query->where(function ($q) use ($workspaceId, $myVendorIds, $myJobOrderIds, $user) {
-                    $q->where('workspace_id', $workspaceId);
-                    if ($myVendorIds->isNotEmpty()) {
+                $query->where(function ($q) use ($resolvedWsId, $myVendorIds, $myJobOrderIds, $user) {
+                    if ($resolvedWsId) {
+                        $q->where('workspace_id', $resolvedWsId);
+                    }
+                    if (!empty($myVendorIds)) {
                         $q->orWhereIn('vendor_id', $myVendorIds);
                     }
-                    if ($myJobOrderIds->isNotEmpty()) {
+                    if (!empty($myJobOrderIds)) {
                         $q->orWhereIn('job_order_id', $myJobOrderIds);
                     }
                     if ($user->email) {
@@ -283,7 +243,7 @@ class NotificationController extends Controller
                     }
                 });
             } else {
-                $query->where('workspace_id', $workspaceId);
+                $query->where('workspace_id', $resolvedWsId);
             }
 
             $count = $query->count();
