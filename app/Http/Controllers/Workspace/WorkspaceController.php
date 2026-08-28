@@ -352,8 +352,7 @@ class WorkspaceController extends Controller
             $currentWorkspaceId = $request->input('workspace_id');
 
             $query = Workspace::with('owner:id,name,email,phone')
-                ->where('status', Workspace::STATUS_ACTIVE)
-                ->where('owner_id', '!=', $user->id);
+                ->where('status', Workspace::STATUS_ACTIVE);
 
             if ($currentWorkspaceId) {
                 $query->where('id', '!=', $currentWorkspaceId);
