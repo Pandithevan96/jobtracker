@@ -79,20 +79,52 @@ class NotificationController extends Controller
                 ->pluck('id')
                 ->toArray();
 
+            // Auto-backfill notification records for any Job Orders assigned to vendor that don't have a notification record yet
+            if (!empty($myJobOrderIds)) {
+                $jobOrders = \App\Models\Job\JobOrder::with('vendor')->whereIn('id', $myJobOrderIds)->get();
+                foreach ($jobOrders as $jo) {
+                    $exists = Notification::where('job_order_id', $jo->id)
+                        ->where('type', Notification::TYPE_JOB_CREATED)
+                        ->exists();
+                    if (!$exists) {
+                        Notification::create([
+                            'workspace_id'     => $jo->workspace_id,
+                            'job_order_id'     => $jo->id,
+                            'vendor_id'        => $jo->vendor_id,
+                            'user_id'          => $jo->created_by,
+                            'channel'          => Notification::CHANNEL_WHATSAPP,
+                            'type'             => Notification::TYPE_JOB_CREATED,
+                            'recipient_number' => $jo->vendor?->whatsapp_number ?? $jo->vendor?->phone ?? null,
+                            'recipient_email'  => $jo->vendor?->email ?? null,
+                            'message'          => sprintf(
+                                '📦 New Job Order %s (%s) has been assigned to %s. Quantity: %s %s.',
+                                $jo->order_number,
+                                $jo->part_name,
+                                $jo->vendor?->shop_name ?? 'your shop',
+                                $jo->quantity_sent,
+                                $jo->uom
+                            ),
+                            'status'           => Notification::STATUS_PENDING,
+                            'sent_at'          => $jo->created_at ?? now(),
+                        ]);
+                    }
+                }
+            }
+
             $mode = $request->input('mode') ?? $request->header('X-App-Mode') ?? 'principal';
 
             $query = Notification::with(['jobOrder', 'vendor', 'user']);
 
             if ($mode === 'vendor') {
                 $query->where(function ($q) use ($resolvedWsId, $myVendorIds, $myJobOrderIds, $user) {
-                    if ($resolvedWsId) {
-                        $q->where('workspace_id', $resolvedWsId);
+                    if (!empty($myJobOrderIds)) {
+                        $q->whereIn('job_order_id', $myJobOrderIds);
                     }
                     if (!empty($myVendorIds)) {
                         $q->orWhereIn('vendor_id', $myVendorIds);
                     }
-                    if (!empty($myJobOrderIds)) {
-                        $q->orWhereIn('job_order_id', $myJobOrderIds);
+                    if ($resolvedWsId) {
+                        $q->orWhere('workspace_id', $resolvedWsId);
                     }
                     if ($user->email) {
                         $q->orWhere('recipient_email', $user->email);
@@ -114,7 +146,38 @@ class NotificationController extends Controller
 
             $notifications = $query->orderBy('created_at', 'desc')->get();
 
-            return HelperFunction::response($notifications, null, 'Notification logs fetched successfully', 'success', '000', Response::HTTP_OK);
+            $formatted = $notifications->map(function ($n) {
+                $typeLabel = 'system';
+                if ($n->type === Notification::TYPE_JOB_CREATED || $n->type === Notification::TYPE_STATUS_UPDATE) {
+                    $typeLabel = 'job';
+                } elseif ($n->type === Notification::TYPE_DC_GENERATED) {
+                    $typeLabel = 'challan';
+                } elseif ($n->type === Notification::TYPE_REJECTION_ALERT) {
+                    $typeLabel = 'rejection';
+                }
+
+                $title = 'System Alert';
+                if ($n->type === Notification::TYPE_JOB_CREATED) {
+                    $title = 'New Job Order Assigned';
+                } elseif ($n->type === Notification::TYPE_STATUS_UPDATE) {
+                    $title = 'Job Order Status Update';
+                } elseif ($n->type === Notification::TYPE_DC_GENERATED) {
+                    $title = 'Delivery Challan Update';
+                } elseif ($n->type === Notification::TYPE_REJECTION_ALERT) {
+                    $title = 'Quality Rejection Alert';
+                }
+
+                return [
+                    'id'         => $n->id,
+                    'title'      => $title,
+                    'message'    => $n->message,
+                    'type'       => $typeLabel,
+                    'created_at' => $n->created_at ? $n->created_at->diffForHumans() : 'Recently',
+                    'read'       => $n->status === Notification::STATUS_DELIVERED || $n->status === Notification::STATUS_SENT,
+                ];
+            });
+
+            return HelperFunction::response($formatted, null, 'Notification logs fetched successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
             return HelperFunction::response(null, null, 'Failed to fetch notifications: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }

@@ -33,6 +33,7 @@ class Notification extends Model
     const TYPE_DC_GENERATED    = 3;
     const TYPE_REJECTION_ALERT = 4;
     const TYPE_GENERAL         = 5;
+    const TYPE_JOB_CREATED     = 6;
 
     // Status constants
     const STATUS_PENDING   = 1;
