@@ -84,6 +84,7 @@ export const VendorsList: React.FC = () => {
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [networkWorkspaces, setNetworkWorkspaces] = useState<any[]>([]);
     const [selectedNetworkWsId, setSelectedNetworkWsId] = useState<string>("");
+    const [isCustomVendor, setIsCustomVendor] = useState(false);
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -147,7 +148,7 @@ export const VendorsList: React.FC = () => {
 
     const handleNetworkWsSelect = (wsIdStr: string) => {
         setSelectedNetworkWsId(wsIdStr);
-        if (!wsIdStr) {
+        if (!wsIdStr || wsIdStr === "CUSTOM") {
             setNewVendor({
                 target_workspace_id: null,
                 shop_name: "",
@@ -176,12 +177,17 @@ export const VendorsList: React.FC = () => {
 
     const handleOpenCreateModal = () => {
         fetchNetworkWorkspaces();
+        setIsCustomVendor(false);
+        setSelectedNetworkWsId("");
         setShowCreateModal(true);
     };
 
     const handleCreateSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newVendor.shop_name) return;
+        if (!newVendor.shop_name) {
+            setCreateError("Please select a company workspace or enter vendor name.");
+            return;
+        }
 
         const workspaceId = await getCurrentWorkspaceId();
         setCreating(true);
@@ -199,6 +205,7 @@ export const VendorsList: React.FC = () => {
 
             setShowCreateModal(false);
             setSelectedNetworkWsId("");
+            setIsCustomVendor(false);
             setNewVendor({
                 target_workspace_id: null,
                 shop_name: "",
@@ -416,39 +423,6 @@ export const VendorsList: React.FC = () => {
                             Register a subcontracting partner to your workspace
                         </p>
 
-                        {/* Network Workspace Selector */}
-                        <div className="mb-5 bg-[#1a1a1a] border border-[#f5a623]/30 p-3.5 rounded-xl space-y-2">
-                            <label className="block text-[#f5a623] font-bold text-xs flex items-center justify-between">
-                                <span className="flex items-center gap-1.5">
-                                    <Globe size={14} /> Import from Network Workspaces
-                                </span>
-                                <span className="text-[10px] bg-[#f5a623]/20 text-[#f5a623] px-2 py-0.5 rounded font-mono">
-                                    {networkWorkspaces.length} Workspaces Registered
-                                </span>
-                            </label>
-                            <select
-                                value={selectedNetworkWsId}
-                                onChange={(e) => handleNetworkWsSelect(e.target.value)}
-                                className="w-full bg-[#141414] border border-[#333] rounded-lg text-white px-3 py-2 focus:outline-none focus:border-[#f5a623] text-xs font-semibold"
-                            >
-                                <option value="">-- Select from JobTrack Network --</option>
-                                {networkWorkspaces.map((ws) => (
-                                    <option key={ws.id} value={ws.id}>
-                                        🏢 {ws.name} {ws.city ? `(${ws.city})` : ''} {ws.contact_person ? `— Owner: ${ws.contact_person}` : ''}
-                                    </option>
-                                ))}
-                            </select>
-                            {selectedNetworkWsId ? (
-                                <p className="text-[11px] text-emerald-400 flex items-center gap-1 font-semibold pt-1">
-                                    <CheckCircle2 size={13} /> Auto-filled workspace details &amp; linked owner account.
-                                </p>
-                            ) : (
-                                <p className="text-[10px] text-[#888]">
-                                    Pick an existing registered workspace on JobTrack to auto-fill their company profile.
-                                </p>
-                            )}
-                        </div>
-
                         {createError && (
                             <div className="mb-4 flex items-center gap-2 text-xs text-red-300 bg-[#2a1414] border border-[#3a1f1f] rounded-xl px-3 py-2">
                                 <AlertCircle size={14} />
@@ -461,22 +435,82 @@ export const VendorsList: React.FC = () => {
                             className="space-y-4 text-xs"
                         >
                             <div>
-                                <label className="block text-[#aaa] font-semibold mb-1">
-                                    Vendor Company Name *
-                                </label>
-                                <input
-                                    type="text"
-                                    required
-                                    placeholder="e.g. Apex Precision Engineering"
-                                    value={newVendor.shop_name}
-                                    onChange={(e) =>
-                                        setNewVendor({
-                                            ...newVendor,
-                                            shop_name: e.target.value,
-                                        })
-                                    }
-                                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-white px-3.5 py-2.5 focus:outline-none focus:border-[#f5a623]"
-                                />
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <label className="block text-[#aaa] font-semibold">
+                                        Vendor Company Workspace *
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const next = !isCustomVendor;
+                                            setIsCustomVendor(next);
+                                            setSelectedNetworkWsId("");
+                                            setNewVendor({
+                                                target_workspace_id: null,
+                                                shop_name: "",
+                                                contact_person: "",
+                                                phone: "",
+                                                email: "",
+                                                city: "Coimbatore",
+                                                gstin: "",
+                                            });
+                                        }}
+                                        className="text-[11px] text-[#f5a623] hover:underline bg-transparent border-none cursor-pointer font-bold flex items-center gap-1"
+                                    >
+                                        {isCustomVendor
+                                            ? "← Select from Network Dropdown"
+                                            : "+ Type Custom Vendor Name"}
+                                    </button>
+                                </div>
+
+                                {!isCustomVendor ? (
+                                    <div className="space-y-1.5">
+                                        <select
+                                            value={selectedNetworkWsId}
+                                            onChange={(e) => {
+                                                if (e.target.value === "CUSTOM") {
+                                                    setIsCustomVendor(true);
+                                                    handleNetworkWsSelect("");
+                                                } else {
+                                                    handleNetworkWsSelect(e.target.value);
+                                                }
+                                            }}
+                                            className="w-full bg-[#1a1a1a] border border-[#f5a623]/40 rounded-xl text-white px-3.5 py-3 focus:outline-none focus:border-[#f5a623] text-xs font-semibold cursor-pointer"
+                                            required
+                                        >
+                                            <option value="">
+                                                {networkWorkspaces.length > 0
+                                                    ? `-- Select Vendor Workspace (${networkWorkspaces.length} Registered) --`
+                                                    : "-- No Other Network Workspaces Available --"}
+                                            </option>
+                                            {networkWorkspaces.map((ws) => (
+                                                <option key={ws.id} value={ws.id}>
+                                                    🏢 {ws.name} {ws.city ? `(${ws.city})` : ''} {ws.contact_person ? `— Owner: ${ws.contact_person}` : ''}
+                                                </option>
+                                            ))}
+                                            <option value="CUSTOM">+ Other Custom / Unregistered Vendor...</option>
+                                        </select>
+                                        {selectedNetworkWsId && selectedNetworkWsId !== "CUSTOM" && (
+                                            <p className="text-[11px] text-emerald-400 flex items-center gap-1 font-semibold pt-0.5">
+                                                <CheckCircle2 size={13} /> Selected company details auto-filled below.
+                                            </p>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="e.g. Apex Precision Engineering"
+                                        value={newVendor.shop_name}
+                                        onChange={(e) =>
+                                            setNewVendor({
+                                                ...newVendor,
+                                                shop_name: e.target.value,
+                                            })
+                                        }
+                                        className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-white px-3.5 py-2.5 focus:outline-none focus:border-[#f5a623]"
+                                    />
+                                )}
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
