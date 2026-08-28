@@ -106,7 +106,8 @@ class NotificationController extends Controller
             $query = Notification::with(['jobOrder', 'vendor', 'user']);
 
             if ($mode === 'vendor') {
-                $query->where(function ($q) use ($myVendorIds, $myJobOrderIds, $user) {
+                $query->where(function ($q) use ($workspaceId, $myVendorIds, $myJobOrderIds, $user) {
+                    $q->where('workspace_id', $workspaceId);
                     if ($myVendorIds->isNotEmpty()) {
                         $q->orWhereIn('vendor_id', $myVendorIds);
                     }
@@ -266,7 +267,8 @@ class NotificationController extends Controller
             $query = Notification::where('created_at', '>=', now()->subDays(30));
 
             if ($mode === 'vendor') {
-                $query->where(function ($q) use ($myVendorIds, $myJobOrderIds, $user) {
+                $query->where(function ($q) use ($workspaceId, $myVendorIds, $myJobOrderIds, $user) {
+                    $q->where('workspace_id', $workspaceId);
                     if ($myVendorIds->isNotEmpty()) {
                         $q->orWhereIn('vendor_id', $myVendorIds);
                     }
