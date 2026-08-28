@@ -10,6 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use App\Models\User\User;
+use Carbon\Carbon;
 
 class AuthController extends Controller
 {
@@ -211,18 +212,20 @@ class AuthController extends Controller
     public function changePassword(Request $request)
     {
         $validation = Validator::make($request->all(), [
-            'current_password' => 'required|string',
-            'new_password'     => 'required|string|min:8|different:current_password',
+            'current_password'  => 'required|string',
+            'new_password'      => 'required|string|min:8|different:current_password',
+            'confirm_password'  => 'required|string|same:new_password',
+        ], [
+            'new_password.min'              => 'New password must be at least 8 characters.',
+            'new_password.different'        => 'New password must be different from your current password.',
+            'confirm_password.same'         => 'Passwords do not match.',
         ]);
 
         if ($validation->fails()) {
             return HelperFunction::response(
-                null,
-                null,
+                null, null,
                 $validation->errors()->first(),
-                'error',
-                '001',
-                Response::HTTP_BAD_REQUEST
+                'error', '001', Response::HTTP_BAD_REQUEST
             );
         }
 
@@ -230,27 +233,214 @@ class AuthController extends Controller
 
         if (!Hash::check($request->input('current_password'), $user->password)) {
             return HelperFunction::response(
-                null,
-                null,
+                null, null,
                 'Current password is incorrect.',
-                'error',
-                '005',
-                Response::HTTP_BAD_REQUEST
+                'error', '005', Response::HTTP_BAD_REQUEST
             );
         }
 
         $user->update([
-            'password' => $request->input('new_password'),
+            'password' => Hash::make($request->input('new_password')),
             'status'   => User::STATUS_ACTIVE,
         ]);
 
         return HelperFunction::response(
-            null,
-            null,
-            'Password changed successfully',
-            'success',
-            '000',
-            Response::HTTP_OK
+            null, null,
+            'Password changed successfully.',
+            'success', '000', Response::HTTP_OK
         );
     }
+
+    /**
+     * Request a password reset OTP (forgot password).
+     * POST /api/auth/forgot-password
+     */
+    public function forgotPassword(Request $request)
+    {
+        try {
+            $validation = Validator::make($request->all(), [
+                'email' => 'required|email',
+            ], [
+                'email.required' => 'Email address is required.',
+                'email.email'    => 'Please enter a valid email address.',
+            ]);
+
+            if ($validation->fails()) {
+                return HelperFunction::response(
+                    null, null,
+                    $validation->errors()->first(),
+                    'error', '001', Response::HTTP_BAD_REQUEST
+                );
+            }
+
+            $email = strtolower(trim($request->input('email')));
+            $user  = User::where('email', $email)->first();
+
+            if (!$user) {
+                // Return success anyway to prevent email enumeration
+                return HelperFunction::response(
+                    null, null,
+                    'If this email is registered, a reset code has been generated.',
+                    'success', '000', Response::HTTP_OK
+                );
+            }
+
+            // Invalidate any previous tokens for this email
+            DB::table('password_reset_tokens')
+                ->where('email', $email)
+                ->update(['used' => true]);
+
+            // Generate a 6-digit OTP
+            $otp = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+
+            DB::table('password_reset_tokens')->insert([
+                'email'      => $email,
+                'token'      => $otp,
+                'expires_at' => Carbon::now()->addMinutes(15),
+                'used'       => false,
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
+            ]);
+
+            // In a real system, this OTP would be sent via SMS/Email/WhatsApp.
+            // For now, we return it in the response for development/demo purposes.
+            return HelperFunction::response(
+                ['otp' => $otp, 'expires_in_minutes' => 15],
+                null,
+                'Reset code generated successfully. In production, this would be sent via SMS/Email.',
+                'success', '000', Response::HTTP_OK
+            );
+        } catch (\Throwable $e) {
+            return HelperFunction::response(
+                null, null,
+                'Failed to process request: ' . $e->getMessage(),
+                'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    /**
+     * Verify OTP without resetting (optional pre-check step).
+     * POST /api/auth/verify-otp
+     */
+    public function verifyOtp(Request $request)
+    {
+        $validation = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'otp'   => 'required|string|size:6',
+        ], [
+            'otp.size' => 'Reset code must be exactly 6 digits.',
+        ]);
+
+        if ($validation->fails()) {
+            return HelperFunction::response(
+                null, null,
+                $validation->errors()->first(),
+                'error', '001', Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        $email = strtolower(trim($request->input('email')));
+        $otp   = $request->input('otp');
+
+        $record = DB::table('password_reset_tokens')
+            ->where('email', $email)
+            ->where('token', $otp)
+            ->where('used', false)
+            ->where('expires_at', '>', Carbon::now())
+            ->first();
+
+        if (!$record) {
+            return HelperFunction::response(
+                null, null,
+                'Invalid or expired reset code. Please request a new one.',
+                'error', '003', Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        return HelperFunction::response(
+            null, null,
+            'Code verified successfully.',
+            'success', '000', Response::HTTP_OK
+        );
+    }
+
+    /**
+     * Reset the password using an OTP.
+     * POST /api/auth/reset-password
+     */
+    public function resetPassword(Request $request)
+    {
+        try {
+            $validation = Validator::make($request->all(), [
+                'email'            => 'required|email',
+                'otp'              => 'required|string|size:6',
+                'new_password'     => 'required|string|min:8',
+                'confirm_password' => 'required|string|same:new_password',
+            ], [
+                'otp.size'                  => 'Reset code must be exactly 6 digits.',
+                'new_password.min'          => 'New password must be at least 8 characters.',
+                'confirm_password.same'     => 'Passwords do not match.',
+            ]);
+
+            if ($validation->fails()) {
+                return HelperFunction::response(
+                    null, null,
+                    $validation->errors()->first(),
+                    'error', '001', Response::HTTP_BAD_REQUEST
+                );
+            }
+
+            $email = strtolower(trim($request->input('email')));
+            $otp   = $request->input('otp');
+
+            $record = DB::table('password_reset_tokens')
+                ->where('email', $email)
+                ->where('token', $otp)
+                ->where('used', false)
+                ->where('expires_at', '>', Carbon::now())
+                ->first();
+
+            if (!$record) {
+                return HelperFunction::response(
+                    null, null,
+                    'Invalid or expired reset code. Please request a new one.',
+                    'error', '003', Response::HTTP_BAD_REQUEST
+                );
+            }
+
+            $user = User::where('email', $email)->first();
+            if (!$user) {
+                return HelperFunction::response(
+                    null, null,
+                    'Account not found.',
+                    'error', '004', Response::HTTP_NOT_FOUND
+                );
+            }
+
+            // Mark OTP as used
+            DB::table('password_reset_tokens')
+                ->where('id', $record->id)
+                ->update(['used' => true, 'updated_at' => Carbon::now()]);
+
+            // Update user password
+            $user->update([
+                'password' => Hash::make($request->input('new_password')),
+                'status'   => User::STATUS_ACTIVE,
+            ]);
+
+            return HelperFunction::response(
+                null, null,
+                'Password reset successfully. You can now sign in with your new password.',
+                'success', '000', Response::HTTP_OK
+            );
+        } catch (\Throwable $e) {
+            return HelperFunction::response(
+                null, null,
+                'Failed to reset password: ' . $e->getMessage(),
+                'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
+    }
 }
+

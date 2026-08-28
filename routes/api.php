@@ -18,8 +18,11 @@ Route::prefix('v1')->group(function () {
      * --------------------------------------------------------------------------------
      */
     Route::prefix('auth')->group(function () {
-        Route::post('register', 'Auth\AuthController@register');
-        Route::post('login',    'Auth\AuthController@login');
+        Route::post('register',        'Auth\AuthController@register');
+        Route::post('login',           'Auth\AuthController@login');
+        Route::post('forgot-password', 'Auth\AuthController@forgotPassword');
+        Route::post('verify-otp',      'Auth\AuthController@verifyOtp');
+        Route::post('reset-password',  'Auth\AuthController@resetPassword');
     });
 
     // Public Razorpay Webhook
