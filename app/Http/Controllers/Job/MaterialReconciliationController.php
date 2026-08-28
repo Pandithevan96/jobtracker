@@ -129,7 +129,7 @@ class MaterialReconciliationController extends Controller
             }
 
             $validation = Validator::make($request->all(), [
-                'workspace_id' => 'nullable|integer|exists:workspaces,id',
+                'workspace_id' => 'nullable|integer',
                 'is_balanced'  => 'nullable|integer|in:0,1',
             ]);
 
@@ -140,29 +140,28 @@ class MaterialReconciliationController extends Controller
             $user = Auth::user();
             $workspaceId = $request->input('workspace_id');
 
-            if (!$workspaceId) {
-                $workspace = Workspace::where(function ($q) use ($user) {
-                    $q->where('owner_id', $user->id)
-                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
-                })->first();
-
-                if ($workspace) {
-                    $workspaceId = $workspace->id;
-                } else {
-                    return HelperFunction::response([], null, 'Material reconciliations fetched successfully', 'success', '000', Response::HTTP_OK);
-                }
-            } else {
+            $workspace = null;
+            if ($workspaceId) {
                 $workspace = Workspace::where('id', $workspaceId)
                     ->where(function ($q) use ($user) {
                         $q->where('owner_id', $user->id)
                             ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
                     })
                     ->first();
-
-                if (!$workspace) {
-                    return HelperFunction::response(null, null, 'Workspace not found or you do not belong to it', 'error', '005', Response::HTTP_FORBIDDEN);
-                }
             }
+
+            if (!$workspace) {
+                $workspace = Workspace::where(function ($q) use ($user) {
+                    $q->where('owner_id', $user->id)
+                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                })->first();
+            }
+
+            if (!$workspace) {
+                return HelperFunction::response([], null, 'Material reconciliations fetched successfully', 'success', '000', Response::HTTP_OK);
+            }
+
+            $workspaceId = $workspace->id;
 
             $query = MaterialReconciliation::with(['jobOrder', 'reconciler'])
                 ->whereHas('jobOrder', function ($q) use ($workspaceId) {

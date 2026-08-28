@@ -138,7 +138,7 @@ class JobOrderController extends Controller
             }
 
             $validation = Validator::make($request->all(), [
-                'workspace_id' => 'nullable|integer|exists:workspaces,id',
+                'workspace_id' => 'nullable|integer',
                 'status'       => 'nullable|integer',
                 'vendor_id'    => 'nullable|integer',
                 'priority'     => 'nullable|integer',
@@ -151,29 +151,28 @@ class JobOrderController extends Controller
             $user = Auth::user();
             $workspaceId = $request->input('workspace_id');
 
-            if (!$workspaceId) {
-                $workspace = Workspace::where(function ($q) use ($user) {
-                    $q->where('owner_id', $user->id)
-                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
-                })->first();
-
-                if ($workspace) {
-                    $workspaceId = $workspace->id;
-                } else {
-                    return HelperFunction::response([], null, 'Job Orders fetched successfully', 'success', '000', Response::HTTP_OK);
-                }
-            } else {
+            $workspace = null;
+            if ($workspaceId) {
                 $workspace = Workspace::where('id', $workspaceId)
                     ->where(function ($q) use ($user) {
                         $q->where('owner_id', $user->id)
                             ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
                     })
                     ->first();
-
-                if (!$workspace) {
-                    return HelperFunction::response(null, null, 'Workspace not found or you do not belong to it', 'error', '005', Response::HTTP_FORBIDDEN);
-                }
             }
+
+            if (!$workspace) {
+                $workspace = Workspace::where(function ($q) use ($user) {
+                    $q->where('owner_id', $user->id)
+                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                })->first();
+            }
+
+            if (!$workspace) {
+                return HelperFunction::response([], null, 'Job Orders fetched successfully', 'success', '000', Response::HTTP_OK);
+            }
+
+            $workspaceId = $workspace->id;
 
             $query = JobOrder::with(['vendor', 'creator', 'workspace'])
                 ->where('workspace_id', $workspaceId);
