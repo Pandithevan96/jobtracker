@@ -335,4 +335,48 @@ class WorkspaceController extends Controller
             return HelperFunction::response(null, null, 'Failed to upload logo: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
+    /**
+     * --------------------------------------------------------------------------------
+     * List all other active network workspaces available to be added as vendors.
+     * POST /api/v1/workspaces/available-vendors
+     * --------------------------------------------------------------------------------
+     * @param  Request $request
+     * @return \Illuminate\Http\JsonResponse
+     * --------------------------------------------------------------------------------
+     */
+    public function availableVendors(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            $currentWorkspaceId = $request->input('workspace_id');
+
+            $query = Workspace::with('owner:id,name,email,phone')
+                ->where('status', Workspace::STATUS_ACTIVE)
+                ->where('owner_id', '!=', $user->id);
+
+            if ($currentWorkspaceId) {
+                $query->where('id', '!=', $currentWorkspaceId);
+            }
+
+            $workspaces = $query->get()->map(function ($ws) {
+                return [
+                    'id'             => $ws->id,
+                    'owner_id'       => $ws->owner_id,
+                    'name'           => $ws->name,
+                    'gstin'          => $ws->gstin,
+                    'city'           => $ws->city,
+                    'state'          => $ws->state,
+                    'address'        => $ws->address,
+                    'phone'          => $ws->phone ?: ($ws->owner ? $ws->owner->phone : null),
+                    'email'          => $ws->owner ? $ws->owner->email : null,
+                    'contact_person' => $ws->owner ? $ws->owner->name : null,
+                ];
+            });
+
+            return HelperFunction::response($workspaces, null, 'Available vendor workspaces fetched successfully', 'success', '000', Response::HTTP_OK);
+        } catch (Exception $e) {
+            return HelperFunction::response(null, null, 'Failed to fetch vendor workspaces: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
 }

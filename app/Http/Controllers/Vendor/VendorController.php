@@ -24,25 +24,38 @@ class VendorController extends Controller
                 return HelperFunction::response(null, null, 'You do not have permission to create vendors', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
+            $user = Auth::user();
+
+            // Auto-resolve workspace_id if omitted
+            if (!$request->filled('workspace_id')) {
+                $workspace = Workspace::where(function ($q) use ($user) {
+                    $q->where('owner_id', $user->id)
+                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                })->first();
+                if ($workspace) {
+                    $request->merge(['workspace_id' => $workspace->id]);
+                }
+            }
+
             $validation = Validator::make($request->all(), [
-                'workspace_id'       => 'required|integer|exists:workspaces,id',
-                'shop_name'          => 'required|string|max:255',
-                'contact_person'     => 'nullable|string|max:255',
-                'phone'              => 'required|string|max:20',
-                'whatsapp_number'    => 'nullable|string|max:20',
-                'email'              => 'nullable|email|max:255',
-                'gstin'              => 'nullable|string|max:15',
-                'address'            => 'nullable|string|max:255',
-                'city'               => 'nullable|string|max:100',
-                'pincode'            => 'nullable|string|max:10',
-                'preferred_language' => 'nullable|integer|in:1,2',
+                'workspace_id'        => 'required|integer|exists:workspaces,id',
+                'target_workspace_id' => 'nullable|integer|exists:workspaces,id',
+                'shop_name'           => 'required|string|max:255',
+                'contact_person'      => 'nullable|string|max:255',
+                'phone'               => 'required|string|max:20',
+                'whatsapp_number'     => 'nullable|string|max:20',
+                'email'               => 'nullable|email|max:255',
+                'gstin'               => 'nullable|string|max:15',
+                'address'             => 'nullable|string|max:255',
+                'city'                => 'nullable|string|max:100',
+                'pincode'             => 'nullable|string|max:10',
+                'preferred_language'  => 'nullable|integer|in:1,2',
             ]);
 
             if ($validation->fails()) {
                 return HelperFunction::response(null, null, $validation->errors()->first(), 'error', '001', Response::HTTP_BAD_REQUEST);
             }
 
-            $user = Auth::user();
             $workspaceId = $request->input('workspace_id');
 
             $workspace = Workspace::where('id', $workspaceId)
@@ -64,8 +77,18 @@ class VendorController extends Controller
                 return HelperFunction::response(null, null, 'Factory plan is limited to 20 vendors. Please upgrade to Industrial plan.', 'error', '004', Response::HTTP_FORBIDDEN);
             }
 
+            $linkedUserId = null;
+            $targetWsId = $request->input('target_workspace_id');
+            if ($targetWsId) {
+                $targetWs = Workspace::find($targetWsId);
+                if ($targetWs && $targetWs->owner_id) {
+                    $linkedUserId = $targetWs->owner_id;
+                }
+            }
+
             $vendor = Vendor::create([
                 'workspace_id'       => $workspaceId,
+                'user_id'            => $linkedUserId,
                 'shop_name'          => $request->input('shop_name'),
                 'contact_person'     => $request->input('contact_person'),
                 'phone'              => $request->input('phone'),
@@ -82,21 +105,25 @@ class VendorController extends Controller
             // Auto-link registered user account and attach workspace membership if email/phone matches
             $vendorEmail = $request->input('email');
             $vendorPhone = $request->input('phone');
-            if ($vendorEmail || $vendorPhone) {
+            if (!$linkedUserId && ($vendorEmail || $vendorPhone)) {
                 $targetUser = \App\Models\User\User::where(function($q) use ($vendorEmail, $vendorPhone) {
                     if ($vendorEmail) $q->where('email', $vendorEmail);
                     if ($vendorPhone) $q->orWhere('phone', $vendorPhone);
                 })->first();
 
                 if ($targetUser && $targetUser->id !== $user->id) {
-                    $workspace->members()->syncWithoutDetaching([
-                        $targetUser->id => [
-                            'role'   => Workspace::MEMBER_ROLE_VENDOR,
-                            'status' => Workspace::MEMBER_STATUS_ACTIVE,
-                        ],
-                    ]);
-                    $vendor->update(['user_id' => $targetUser->id]);
+                    $linkedUserId = $targetUser->id;
+                    $vendor->update(['user_id' => $linkedUserId]);
                 }
+            }
+
+            if ($linkedUserId && $linkedUserId !== $user->id) {
+                $workspace->members()->syncWithoutDetaching([
+                    $linkedUserId => [
+                        'role'   => Workspace::MEMBER_ROLE_VENDOR,
+                        'status' => Workspace::MEMBER_STATUS_ACTIVE,
+                    ],
+                ]);
             }
 
             return HelperFunction::response($vendor, null, 'Vendor created successfully', 'success', '000', Response::HTTP_CREATED);

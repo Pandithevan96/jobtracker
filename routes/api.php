@@ -45,7 +45,8 @@ Route::prefix('v1')->group(function () {
             Route::post('list',        'Workspace\WorkspaceController@list');
             Route::post('details',     'Workspace\WorkspaceController@show');
             Route::post('update',      'Workspace\WorkspaceController@update');
-            Route::post('upload-logo', 'Workspace\WorkspaceController@uploadLogo');
+            Route::post('upload-logo',        'Workspace\WorkspaceController@uploadLogo');
+            Route::post('available-vendors',  'Workspace\WorkspaceController@availableVendors');
         });
 
         // Vendor Routes

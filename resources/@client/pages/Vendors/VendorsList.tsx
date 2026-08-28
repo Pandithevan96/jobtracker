@@ -12,6 +12,8 @@ import {
     ChevronRight,
     Loader2,
     AlertCircle,
+    Globe,
+    CheckCircle2
 } from "lucide-react";
 
 export interface Vendor {
@@ -27,28 +29,17 @@ export interface Vendor {
     pincode?: string;
     preferred_language?: number;
     status?: number;
+    user_id?: number;
 }
 
-/**
- * Resolves the current workspace_id.
- *
- * auth_user (stored after login) has no workspace field, so this fetches
- * POST /workspaces/list (returns all workspaces the user owns/belongs to)
- * and uses the first one, caching it in localStorage so we don't refetch
- * on every call.
- *
- * NOTE: if a user can belong to multiple workspaces, this just picks the
- * first one — you'll eventually want a proper workspace switcher that
- * sets 'workspace_id' in localStorage explicitly instead of relying on
- * this fallback.
- */
 let workspaceFetchPromise: Promise<number | null> | null = null;
 
 const getCurrentWorkspaceId = async (): Promise<number | null> => {
     const cached = localStorage.getItem("workspace_id");
-    if (cached) return Number(cached);
+    if (cached && cached !== "undefined" && cached !== "null" && !isNaN(Number(cached))) {
+        return Number(cached);
+    }
 
-    // Avoid firing multiple simultaneous /workspaces/list calls
     if (workspaceFetchPromise) return workspaceFetchPromise;
 
     workspaceFetchPromise = (async () => {
@@ -81,6 +72,7 @@ export const VendorsList: React.FC = () => {
     const [showCreateModal, setShowCreateModal] = useState(false);
 
     const [newVendor, setNewVendor] = useState({
+        target_workspace_id: null as number | null,
         shop_name: "",
         contact_person: "",
         phone: "",
@@ -89,8 +81,10 @@ export const VendorsList: React.FC = () => {
         gstin: "",
     });
 
-    // No static fallback data — starts empty until the API responds
     const [vendors, setVendors] = useState<Vendor[]>([]);
+    const [networkWorkspaces, setNetworkWorkspaces] = useState<any[]>([]);
+    const [selectedNetworkWsId, setSelectedNetworkWsId] = useState<string>("");
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
@@ -98,25 +92,19 @@ export const VendorsList: React.FC = () => {
 
     useEffect(() => {
         fetchVendors();
+        fetchNetworkWorkspaces();
     }, []);
 
     const fetchVendors = async () => {
         const workspaceId = await getCurrentWorkspaceId();
-        if (!workspaceId) {
-            setVendors([]);
-            setLoading(false);
-            setError("No workspace selected — cannot load vendors.");
-            return;
-        }
-
         setLoading(true);
         setError(null);
         try {
-            const res = await apiClient.post("/vendors/list", {
-                workspace_id: workspaceId,
-            });
+            const payload: Record<string, any> = {};
+            if (workspaceId) payload.workspace_id = workspaceId;
 
-            // Backend wraps everything (success or error) in { status, message, data, code }
+            const res = await apiClient.post("/vendors/list", payload);
+
             if (res.data?.status === "error") {
                 setVendors([]);
                 setError(res.data.message || "Failed to load vendors");
@@ -128,8 +116,6 @@ export const VendorsList: React.FC = () => {
                 setVendors(data);
             } else {
                 setVendors([]);
-                setError("Unexpected response shape from /vendors/list");
-                console.error("Unexpected /vendors/list response:", res.data);
             }
         } catch (e: any) {
             setVendors([]);
@@ -144,31 +130,26 @@ export const VendorsList: React.FC = () => {
         }
     };
 
-    const handleCreateSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newVendor.shop_name) return;
-
-        const workspaceId = await getCurrentWorkspaceId();
-        if (!workspaceId) {
-            setCreateError("No workspace selected — cannot create vendor.");
-            return;
-        }
-
-        setCreating(true);
-        setCreateError(null);
+    const fetchNetworkWorkspaces = async () => {
         try {
-            const res = await apiClient.post("/vendors/create", {
-                ...newVendor,
-                workspace_id: workspaceId,
-            });
+            const workspaceId = await getCurrentWorkspaceId();
+            const payload: Record<string, any> = {};
+            if (workspaceId) payload.workspace_id = workspaceId;
 
-            if (res.data?.status === "error") {
-                setCreateError(res.data.message || "Failed to create vendor");
-                return;
+            const res = await apiClient.post("/workspaces/available-vendors", payload);
+            if (Array.isArray(res.data?.data)) {
+                setNetworkWorkspaces(res.data.data);
             }
+        } catch (e) {
+            console.error("Failed to fetch network vendor workspaces:", e);
+        }
+    };
 
-            setShowCreateModal(false);
+    const handleNetworkWsSelect = (wsIdStr: string) => {
+        setSelectedNetworkWsId(wsIdStr);
+        if (!wsIdStr) {
             setNewVendor({
+                target_workspace_id: null,
                 shop_name: "",
                 contact_person: "",
                 phone: "",
@@ -176,7 +157,57 @@ export const VendorsList: React.FC = () => {
                 city: "Coimbatore",
                 gstin: "",
             });
-            // Refetch so the list reflects what the server actually stored
+            return;
+        }
+
+        const selectedWs = networkWorkspaces.find((w) => String(w.id) === wsIdStr);
+        if (selectedWs) {
+            setNewVendor({
+                target_workspace_id: selectedWs.id,
+                shop_name: selectedWs.name || "",
+                contact_person: selectedWs.contact_person || "",
+                phone: selectedWs.phone || "",
+                email: selectedWs.email || "",
+                city: selectedWs.city || "Coimbatore",
+                gstin: selectedWs.gstin || "",
+            });
+        }
+    };
+
+    const handleOpenCreateModal = () => {
+        fetchNetworkWorkspaces();
+        setShowCreateModal(true);
+    };
+
+    const handleCreateSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newVendor.shop_name) return;
+
+        const workspaceId = await getCurrentWorkspaceId();
+        setCreating(true);
+        setCreateError(null);
+        try {
+            const payload: Record<string, any> = { ...newVendor };
+            if (workspaceId) payload.workspace_id = workspaceId;
+
+            const res = await apiClient.post("/vendors/create", payload);
+
+            if (res.data?.status === "error") {
+                setCreateError(res.data.message || "Failed to create vendor");
+                return;
+            }
+
+            setShowCreateModal(false);
+            setSelectedNetworkWsId("");
+            setNewVendor({
+                target_workspace_id: null,
+                shop_name: "",
+                contact_person: "",
+                phone: "",
+                email: "",
+                city: "Coimbatore",
+                gstin: "",
+            });
             await fetchVendors();
         } catch (e: any) {
             setCreateError(
@@ -209,13 +240,12 @@ export const VendorsList: React.FC = () => {
                         <Building2 className="text-[#f5a623]" size={24} />
                     </h1>
                     <p className="text-xs text-[#888] mt-1">
-                        Manage vendor directory, contact profiles, and job
-                        capabilities
+                        Manage vendor directory, contact profiles, and registered network partners
                     </p>
                 </div>
 
                 <button
-                    onClick={() => setShowCreateModal(true)}
+                    onClick={handleOpenCreateModal}
                     className="bg-[#f5a623] hover:bg-[#e0951c] text-black font-bold text-xs px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 border-none cursor-pointer self-start sm:self-auto"
                 >
                     <Plus size={16} />
@@ -289,8 +319,11 @@ export const VendorsList: React.FC = () => {
                                             {vendor.shop_name.charAt(0)}
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-bold text-white group-hover:text-[#f5a623] transition-colors">
-                                                {vendor.shop_name}
+                                            <h3 className="text-sm font-bold text-white group-hover:text-[#f5a623] transition-colors flex items-center gap-1.5">
+                                                <span>{vendor.shop_name}</span>
+                                                {vendor.user_id && (
+                                                    <Globe size={13} className="text-emerald-400" title="Linked Network Workspace" />
+                                                )}
                                             </h3>
                                             {vendor.city && (
                                                 <p className="text-[11px] text-[#888] flex items-center gap-1 mt-0.5">
@@ -368,7 +401,7 @@ export const VendorsList: React.FC = () => {
             {/* Modal */}
             {showCreateModal && (
                 <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-[#141414] border border-[#2a2a2a] w-full max-w-lg rounded-2xl p-6 relative">
+                    <div className="bg-[#141414] border border-[#2a2a2a] w-full max-w-lg rounded-2xl p-6 relative max-h-[90vh] overflow-y-auto">
                         <button
                             onClick={() => setShowCreateModal(false)}
                             className="absolute top-4 right-4 text-[#888] hover:text-white bg-transparent border-none cursor-pointer"
@@ -383,6 +416,39 @@ export const VendorsList: React.FC = () => {
                             Register a subcontracting partner to your workspace
                         </p>
 
+                        {/* Network Workspace Selector */}
+                        <div className="mb-5 bg-[#1a1a1a] border border-[#f5a623]/30 p-3.5 rounded-xl space-y-2">
+                            <label className="block text-[#f5a623] font-bold text-xs flex items-center justify-between">
+                                <span className="flex items-center gap-1.5">
+                                    <Globe size={14} /> Import from Network Workspaces
+                                </span>
+                                <span className="text-[10px] bg-[#f5a623]/20 text-[#f5a623] px-2 py-0.5 rounded font-mono">
+                                    {networkWorkspaces.length} Workspaces Registered
+                                </span>
+                            </label>
+                            <select
+                                value={selectedNetworkWsId}
+                                onChange={(e) => handleNetworkWsSelect(e.target.value)}
+                                className="w-full bg-[#141414] border border-[#333] rounded-lg text-white px-3 py-2 focus:outline-none focus:border-[#f5a623] text-xs font-semibold"
+                            >
+                                <option value="">-- Select from JobTrack Network --</option>
+                                {networkWorkspaces.map((ws) => (
+                                    <option key={ws.id} value={ws.id}>
+                                        🏢 {ws.name} {ws.city ? `(${ws.city})` : ''} {ws.contact_person ? `— Owner: ${ws.contact_person}` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            {selectedNetworkWsId ? (
+                                <p className="text-[11px] text-emerald-400 flex items-center gap-1 font-semibold pt-1">
+                                    <CheckCircle2 size={13} /> Auto-filled workspace details &amp; linked owner account.
+                                </p>
+                            ) : (
+                                <p className="text-[10px] text-[#888]">
+                                    Pick an existing registered workspace on JobTrack to auto-fill their company profile.
+                                </p>
+                            )}
+                        </div>
+
                         {createError && (
                             <div className="mb-4 flex items-center gap-2 text-xs text-red-300 bg-[#2a1414] border border-[#3a1f1f] rounded-xl px-3 py-2">
                                 <AlertCircle size={14} />
@@ -396,7 +462,7 @@ export const VendorsList: React.FC = () => {
                         >
                             <div>
                                 <label className="block text-[#aaa] font-semibold mb-1">
-                                    Vendor Company Name
+                                    Vendor Company Name *
                                 </label>
                                 <input
                                     type="text"
@@ -416,7 +482,7 @@ export const VendorsList: React.FC = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-[#aaa] font-semibold mb-1">
-                                        Contact Person
+                                        Contact Person *
                                     </label>
                                     <input
                                         type="text"
@@ -434,7 +500,7 @@ export const VendorsList: React.FC = () => {
                                 </div>
                                 <div>
                                     <label className="block text-[#aaa] font-semibold mb-1">
-                                        Phone Number
+                                        Phone Number *
                                     </label>
                                     <input
                                         type="text"
