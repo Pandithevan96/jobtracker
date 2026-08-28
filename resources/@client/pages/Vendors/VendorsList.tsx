@@ -241,19 +241,31 @@ export const VendorsList: React.FC = () => {
         <div className="space-y-6 max-w-7xl mx-auto">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-                        Vendors &amp; Subcontractors{" "}
-                        <Building2 className="text-[#f5a623]" size={24} />
-                    </h1>
-                    <p className="text-xs text-[#888] mt-1">
-                        Manage vendor directory, contact profiles, and registered network partners
-                    </p>
+                <div className="flex items-center justify-between w-full sm:w-auto">
+                    <div>
+                        <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
+                            Vendors &amp; Subcontractors{" "}
+                            <Building2 className="text-[#f5a623]" size={24} />
+                        </h1>
+                        <p className="text-xs text-[#888] mt-1">
+                            Manage vendor directory, contact profiles, and registered network partners
+                        </p>
+                    </div>
+
+                    {/* Mobile Compact Header Button */}
+                    <button
+                        onClick={handleOpenCreateModal}
+                        className="sm:hidden bg-[#f5a623] hover:bg-[#e0951c] text-black font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 border-none cursor-pointer shrink-0 ml-2"
+                    >
+                        <Plus size={16} />
+                        <span>Add</span>
+                    </button>
                 </div>
 
+                {/* Desktop Header Button */}
                 <button
                     onClick={handleOpenCreateModal}
-                    className="bg-[#f5a623] hover:bg-[#e0951c] text-black font-bold text-xs px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 border-none cursor-pointer self-start sm:self-auto"
+                    className="hidden sm:flex bg-[#f5a623] hover:bg-[#e0951c] text-black font-bold text-xs px-4 py-2.5 rounded-xl transition-all items-center gap-2 border-none cursor-pointer self-start sm:self-auto"
                 >
                     <Plus size={16} />
                     <span>Add Vendor</span>
@@ -610,6 +622,15 @@ export const VendorsList: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* Mobile Floating Action Button (FAB) */}
+            <button
+                onClick={handleOpenCreateModal}
+                className="sm:hidden fixed bottom-6 right-6 z-40 bg-[#f5a623] active:bg-[#e0951c] text-black font-extrabold text-xs px-4 py-3.5 rounded-full shadow-2xl flex items-center gap-2 border-2 border-black active:scale-95 transition-transform"
+            >
+                <Plus size={18} />
+                <span>Add Vendor</span>
+            </button>
         </div>
     );
 };
