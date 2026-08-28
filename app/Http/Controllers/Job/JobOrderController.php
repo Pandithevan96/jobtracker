@@ -195,6 +195,14 @@ class JobOrderController extends Controller
 
             $workspaceId = $workspace->id;
 
+            // Auto-link vendor records matching user's workspace names
+            $myWorkspaceNames = Workspace::where('owner_id', $user->id)->pluck('name')->toArray();
+            if (!empty($myWorkspaceNames)) {
+                Vendor::whereIn('shop_name', $myWorkspaceNames)
+                    ->whereNull('user_id')
+                    ->update(['user_id' => $user->id]);
+            }
+
             $query = JobOrder::with(['vendor', 'creator', 'workspace']);
 
             // Find all Vendor IDs associated with this user

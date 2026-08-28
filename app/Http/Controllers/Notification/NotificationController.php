@@ -82,6 +82,14 @@ class NotificationController extends Controller
 
             $workspaceId = $workspace->id;
 
+            // Auto-link vendor records matching user's workspace names
+            $myWorkspaceNames = Workspace::where('owner_id', $user->id)->pluck('name')->toArray();
+            if (!empty($myWorkspaceNames)) {
+                \App\Models\Vendor\Vendor::whereIn('shop_name', $myWorkspaceNames)
+                    ->whereNull('user_id')
+                    ->update(['user_id' => $user->id]);
+            }
+
             $myVendorIds = \App\Models\Vendor\Vendor::where('user_id', $user->id)
                 ->orWhere(function ($q) use ($user) {
                     if ($user->email) $q->where('email', $user->email);
@@ -89,24 +97,27 @@ class NotificationController extends Controller
                 })
                 ->pluck('id');
 
+            $myJobOrderIds = \App\Models\Job\JobOrder::whereIn('vendor_id', $myVendorIds)
+                ->orWhere('created_by', $user->id)
+                ->pluck('id');
+
             $query = Notification::with(['jobOrder', 'vendor', 'user']);
 
-            if ($myVendorIds->isNotEmpty() || $user->email || $user->phone) {
-                $query->where(function ($q) use ($workspaceId, $myVendorIds, $user) {
-                    $q->where('workspace_id', $workspaceId);
-                    if ($myVendorIds->isNotEmpty()) {
-                        $q->orWhereIn('vendor_id', $myVendorIds);
-                    }
-                    if ($user->email) {
-                        $q->orWhere('recipient_email', $user->email);
-                    }
-                    if ($user->phone) {
-                        $q->orWhere('recipient_number', $user->phone);
-                    }
-                });
-            } else {
-                $query->where('workspace_id', $workspaceId);
-            }
+            $query->where(function ($q) use ($workspaceId, $myVendorIds, $myJobOrderIds, $user) {
+                $q->where('workspace_id', $workspaceId);
+                if ($myVendorIds->isNotEmpty()) {
+                    $q->orWhereIn('vendor_id', $myVendorIds);
+                }
+                if ($myJobOrderIds->isNotEmpty()) {
+                    $q->orWhereIn('job_order_id', $myJobOrderIds);
+                }
+                if ($user->email) {
+                    $q->orWhere('recipient_email', $user->email);
+                }
+                if ($user->phone) {
+                    $q->orWhere('recipient_number', $user->phone);
+                }
+            });
 
             if ($request->filled('channel')) {
                 $query->where('channel', $request->input('channel'));
@@ -226,6 +237,14 @@ class NotificationController extends Controller
 
             $workspaceId = $workspace->id;
 
+            // Auto-link vendor records matching user's workspace names
+            $myWorkspaceNames = Workspace::where('owner_id', $user->id)->pluck('name')->toArray();
+            if (!empty($myWorkspaceNames)) {
+                \App\Models\Vendor\Vendor::whereIn('shop_name', $myWorkspaceNames)
+                    ->whereNull('user_id')
+                    ->update(['user_id' => $user->id]);
+            }
+
             $myVendorIds = \App\Models\Vendor\Vendor::where('user_id', $user->id)
                 ->orWhere(function ($q) use ($user) {
                     if ($user->email) $q->where('email', $user->email);
@@ -233,24 +252,27 @@ class NotificationController extends Controller
                 })
                 ->pluck('id');
 
+            $myJobOrderIds = \App\Models\Job\JobOrder::whereIn('vendor_id', $myVendorIds)
+                ->orWhere('created_by', $user->id)
+                ->pluck('id');
+
             $query = Notification::where('created_at', '>=', now()->subDays(30));
 
-            if ($myVendorIds->isNotEmpty() || $user->email || $user->phone) {
-                $query->where(function ($q) use ($workspaceId, $myVendorIds, $user) {
-                    $q->where('workspace_id', $workspaceId);
-                    if ($myVendorIds->isNotEmpty()) {
-                        $q->orWhereIn('vendor_id', $myVendorIds);
-                    }
-                    if ($user->email) {
-                        $q->orWhere('recipient_email', $user->email);
-                    }
-                    if ($user->phone) {
-                        $q->orWhere('recipient_number', $user->phone);
-                    }
-                });
-            } else {
-                $query->where('workspace_id', $workspaceId);
-            }
+            $query->where(function ($q) use ($workspaceId, $myVendorIds, $myJobOrderIds, $user) {
+                $q->where('workspace_id', $workspaceId);
+                if ($myVendorIds->isNotEmpty()) {
+                    $q->orWhereIn('vendor_id', $myVendorIds);
+                }
+                if ($myJobOrderIds->isNotEmpty()) {
+                    $q->orWhereIn('job_order_id', $myJobOrderIds);
+                }
+                if ($user->email) {
+                    $q->orWhere('recipient_email', $user->email);
+                }
+                if ($user->phone) {
+                    $q->orWhere('recipient_number', $user->phone);
+                }
+            });
 
             $count = $query->count();
 
