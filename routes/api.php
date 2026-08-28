@@ -28,6 +28,23 @@ Route::prefix('v1')->group(function () {
     // Public WhatsApp Bot Webhook
     Route::post('whatsapp/webhook', 'Notification\WhatsappBotController@webhook');
 
+    // Public Route to trigger DB Migrate Fresh on Render
+    Route::get('system/migrate-fresh-reset-db-9823472394', function () {
+        try {
+            \Illuminate\Support\Facades\Artisan::call('migrate:fresh', ['--force' => true]);
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Render database migrated fresh successfully!',
+                'output'  => \Illuminate\Support\Facades\Artisan::output(),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    });
+
     /*
     |--------------------------------------------------------------------------
     | Protected Routes (Bearer token required)
