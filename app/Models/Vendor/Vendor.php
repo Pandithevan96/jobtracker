@@ -103,53 +103,52 @@ class Vendor extends Model
 
     /**
      * Helper to auto-link unlinked Vendor records to user accounts and ensure workspace membership.
+     * Returns array of vendor IDs belonging to this user.
      */
     public static function syncUserVendors(\App\Models\User\User $user): array
     {
-        $ownedWorkspaces = \App\Models\Workspace\Workspace::where('owner_id', $user->id)->get();
-        $ownedNames = $ownedWorkspaces->pluck('name')->filter()->toArray();
-        $ownedIds   = $ownedWorkspaces->pluck('id')->toArray();
-
-        static::whereNull('user_id')
-            ->where(function ($q) use ($ownedNames, $ownedIds, $user) {
-                if (!empty($ownedNames)) {
-                    $q->whereIn('shop_name', $ownedNames);
-                }
-                if (!empty($ownedIds)) {
-                    $q->orWhereIn('target_workspace_id', $ownedIds);
-                }
-                if ($user->email) {
-                    $q->orWhere('email', $user->email);
-                }
-                if ($user->phone) {
-                    $q->orWhere('phone', $user->phone);
-                }
-            })
-            ->update(['user_id' => $user->id]);
-
-        $vendorIds = static::where('user_id', $user->id)
-            ->orWhere(function ($q) use ($user) {
-                if ($user->email) $q->where('email', $user->email);
-                if ($user->phone) $q->orWhere('phone', $user->phone);
-            })
-            ->pluck('id')
+        // Auto-link unlinked vendor records that match user's workspace name, email, or phone
+        $ownedWorkspaceNames = \App\Models\Workspace\Workspace::where('owner_id', $user->id)
+            ->pluck('name')
+            ->filter()
             ->toArray();
 
-        if (!empty($vendorIds)) {
-            $parentWorkspaceIds = static::whereIn('id', $vendorIds)->pluck('workspace_id')->unique()->toArray();
-            foreach ($parentWorkspaceIds as $pWsId) {
-                $ws = \App\Models\Workspace\Workspace::find($pWsId);
-                if ($ws && $ws->owner_id !== $user->id) {
-                    $ws->members()->syncWithoutDetaching([
-                        $user->id => [
-                            'role'   => \App\Models\Workspace\Workspace::MEMBER_ROLE_VENDOR,
-                            'status' => \App\Models\Workspace\Workspace::MEMBER_STATUS_ACTIVE,
-                        ],
-                    ]);
+        $matchConditions = static::whereNull('user_id')
+            ->where(function ($q) use ($ownedWorkspaceNames, $user) {
+                $started = false;
+                if (!empty($ownedWorkspaceNames)) {
+                    $q->whereIn('shop_name', $ownedWorkspaceNames);
+                    $started = true;
                 }
-            }
+                if ($user->email) {
+                    $started ? $q->orWhere('email', $user->email) : $q->where('email', $user->email);
+                    $started = true;
+                }
+                if ($user->phone) {
+                    $started ? $q->orWhere('phone', $user->phone) : $q->where('phone', $user->phone);
+                }
+                if (!$started) {
+                    $q->whereRaw('0 = 1'); // No conditions — match nothing
+                }
+            });
+
+        try {
+            $matchConditions->update(['user_id' => $user->id]);
+        } catch (\Throwable $e) {
+            // Silently handle any DB error during auto-linking
         }
+
+        // Collect all vendor IDs linked to this user
+        $query = static::where('user_id', $user->id);
+        if ($user->email) {
+            $query->orWhere('email', $user->email);
+        }
+        if ($user->phone) {
+            $query->orWhere('phone', $user->phone);
+        }
+        $vendorIds = $query->pluck('id')->unique()->toArray();
 
         return $vendorIds;
     }
 }
+

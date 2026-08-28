@@ -29,13 +29,13 @@ export const NotificationsPage: React.FC = () => {
         setError(null);
         try {
             const cachedWorkspaceId = localStorage.getItem("workspace_id");
+            const appMode = localStorage.getItem("app_mode") || "principal";
             const workspaceId = cachedWorkspaceId ? Number(cachedWorkspaceId) : null;
-            if (!workspaceId) {
-                setNotifications([]);
-                setLoading(false);
-                return;
-            }
-            const res = await apiClient.post("/notifications/list", { workspace_id: workspaceId });
+
+            const body: Record<string, any> = { mode: appMode };
+            if (workspaceId) body.workspace_id = workspaceId;
+
+            const res = await apiClient.post("/notifications/list", body);
             const payload = res?.data?.data ?? res?.data?.notifications ?? res?.data ?? [];
             setNotifications(Array.isArray(payload) ? payload : []);
         } catch (e: any) {

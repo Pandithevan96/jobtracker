@@ -88,8 +88,10 @@ export const Layout: React.FC = () => {
     // -------------------------------------------------------------------------
     const fetchNotifCount = useCallback(async (wsId: number) => {
         try {
+            const appMode = localStorage.getItem("app_mode") || "principal";
             const res = await apiClient.post("/notifications/unread-count", {
                 workspace_id: wsId,
+                mode: appMode,
             });
             const count =
                 res?.data?.data?.count ??
