@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import apiClient from '@/services/apiClient';
 import { useAuth } from '@/context/AuthContext';
+import { DatePicker } from '@/components/DatePicker/DatePicker';
 import {
   FileText,
   Search,
@@ -671,12 +672,12 @@ export const JobOrdersList: React.FC = () => {
                 <label className="block text-[#aaa] font-semibold mb-1">
                   Due Date <span className="text-red-400">*</span>
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   value={newOrder.due_date}
                   min={getTodayDate()}
-                  onChange={(e) => { setNewOrder({ ...newOrder, due_date: e.target.value }); setFieldErrors((f) => ({ ...f, due_date: '' })); }}
-                  className={`w-full bg-[#1a1a1a] border ${fieldErrors.due_date ? 'border-red-500' : 'border-[#2a2a2a]'} rounded-xl text-white px-3.5 py-2.5 focus:outline-none focus:border-[#f5a623]`}
+                  placeholder="Select due date"
+                  hasError={!!fieldErrors.due_date}
+                  onChange={(d) => { setNewOrder({ ...newOrder, due_date: d }); setFieldErrors((f) => ({ ...f, due_date: '' })); }}
                 />
                 {fieldErrors.due_date && <p className="text-red-400 mt-1 flex items-center gap-1"><AlertCircle size={11} />{fieldErrors.due_date}</p>}
               </div>
