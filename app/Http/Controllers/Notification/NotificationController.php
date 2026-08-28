@@ -74,15 +74,20 @@ class NotificationController extends Controller
 
             $resolvedWsId = $workspace ? $workspace->id : $workspaceId;
 
-            $myJobOrderIds = \App\Models\Job\JobOrder::whereIn('vendor_id', $myVendorIds)
-                ->orWhere('created_by', $user->id)
-                ->pluck('id')
-                ->toArray();
+            // Find all Job Orders visible in vendor mode
+            $visibleJobOrders = \App\Models\Job\JobOrder::with('vendor')
+                ->where(function ($q) use ($resolvedWsId, $myVendorIds, $user) {
+                    if ($resolvedWsId) $q->where('workspace_id', $resolvedWsId);
+                    if (!empty($myVendorIds)) $q->orWhereIn('vendor_id', $myVendorIds);
+                    $q->orWhere('created_by', $user->id);
+                })
+                ->get();
 
-            // Auto-backfill notification records for any Job Orders assigned to vendor that don't have a notification record yet
-            if (!empty($myJobOrderIds)) {
-                $jobOrders = \App\Models\Job\JobOrder::with('vendor')->whereIn('id', $myJobOrderIds)->get();
-                foreach ($jobOrders as $jo) {
+            $myJobOrderIds = $visibleJobOrders->pluck('id')->toArray();
+
+            // Auto-backfill notification records for any visible Job Orders without a notification record
+            if (!empty($visibleJobOrders)) {
+                foreach ($visibleJobOrders as $jo) {
                     $exists = Notification::where('job_order_id', $jo->id)
                         ->where('type', Notification::TYPE_JOB_CREATED)
                         ->exists();
@@ -117,20 +122,26 @@ class NotificationController extends Controller
 
             if ($mode === 'vendor') {
                 $query->where(function ($q) use ($resolvedWsId, $myVendorIds, $myJobOrderIds, $user) {
+                    $hasClause = false;
                     if (!empty($myJobOrderIds)) {
                         $q->whereIn('job_order_id', $myJobOrderIds);
-                    }
-                    if (!empty($myVendorIds)) {
-                        $q->orWhereIn('vendor_id', $myVendorIds);
+                        $hasClause = true;
                     }
                     if ($resolvedWsId) {
-                        $q->orWhere('workspace_id', $resolvedWsId);
+                        $hasClause ? $q->orWhere('workspace_id', $resolvedWsId) : $q->where('workspace_id', $resolvedWsId);
+                        $hasClause = true;
+                    }
+                    if (!empty($myVendorIds)) {
+                        $hasClause ? $q->orWhereIn('vendor_id', $myVendorIds) : $q->whereIn('vendor_id', $myVendorIds);
+                        $hasClause = true;
                     }
                     if ($user->email) {
-                        $q->orWhere('recipient_email', $user->email);
+                        $hasClause ? $q->orWhere('recipient_email', $user->email) : $q->where('recipient_email', $user->email);
+                        $hasClause = true;
                     }
                     if ($user->phone) {
-                        $q->orWhere('recipient_number', $user->phone);
+                        $hasClause ? $q->orWhere('recipient_number', $user->phone) : $q->where('recipient_number', $user->phone);
+                        $hasClause = true;
                     }
                 });
             } else {
@@ -278,10 +289,16 @@ class NotificationController extends Controller
 
             $resolvedWsId = $workspace ? $workspace->id : $workspaceId;
 
-            $myJobOrderIds = \App\Models\Job\JobOrder::whereIn('vendor_id', $myVendorIds)
-                ->orWhere('created_by', $user->id)
-                ->pluck('id')
-                ->toArray();
+            // Find all Job Orders visible in vendor mode
+            $visibleJobOrders = \App\Models\Job\JobOrder::with('vendor')
+                ->where(function ($q) use ($resolvedWsId, $myVendorIds, $user) {
+                    if ($resolvedWsId) $q->where('workspace_id', $resolvedWsId);
+                    if (!empty($myVendorIds)) $q->orWhereIn('vendor_id', $myVendorIds);
+                    $q->orWhere('created_by', $user->id);
+                })
+                ->get();
+
+            $myJobOrderIds = $visibleJobOrders->pluck('id')->toArray();
 
             $mode = $request->input('mode') ?? $request->header('X-App-Mode') ?? 'principal';
 
@@ -289,20 +306,26 @@ class NotificationController extends Controller
 
             if ($mode === 'vendor') {
                 $query->where(function ($q) use ($resolvedWsId, $myVendorIds, $myJobOrderIds, $user) {
+                    $hasClause = false;
+                    if (!empty($myJobOrderIds)) {
+                        $q->whereIn('job_order_id', $myJobOrderIds);
+                        $hasClause = true;
+                    }
                     if ($resolvedWsId) {
-                        $q->where('workspace_id', $resolvedWsId);
+                        $hasClause ? $q->orWhere('workspace_id', $resolvedWsId) : $q->where('workspace_id', $resolvedWsId);
+                        $hasClause = true;
                     }
                     if (!empty($myVendorIds)) {
-                        $q->orWhereIn('vendor_id', $myVendorIds);
-                    }
-                    if (!empty($myJobOrderIds)) {
-                        $q->orWhereIn('job_order_id', $myJobOrderIds);
+                        $hasClause ? $q->orWhereIn('vendor_id', $myVendorIds) : $q->whereIn('vendor_id', $myVendorIds);
+                        $hasClause = true;
                     }
                     if ($user->email) {
-                        $q->orWhere('recipient_email', $user->email);
+                        $hasClause ? $q->orWhere('recipient_email', $user->email) : $q->where('recipient_email', $user->email);
+                        $hasClause = true;
                     }
                     if ($user->phone) {
-                        $q->orWhere('recipient_number', $user->phone);
+                        $hasClause ? $q->orWhere('recipient_number', $user->phone) : $q->where('recipient_number', $user->phone);
+                        $hasClause = true;
                     }
                 });
             } else {
