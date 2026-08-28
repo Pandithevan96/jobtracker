@@ -31,6 +31,26 @@ class JobOrderController extends Controller
 
             $user = Auth::user();
 
+            // ── Guard 1: Must have at least one owned workspace ──────────────
+            $ownedWorkspace = Workspace::where('owner_id', $user->id)->first();
+            if (!$ownedWorkspace) {
+                return HelperFunction::response(
+                    null, null,
+                    'You must create a workspace before issuing job orders. Please set up your company workspace first.',
+                    'error', '010', Response::HTTP_UNPROCESSABLE_ENTITY
+                );
+            }
+
+            // ── Guard 2: Must have at least one vendor registered ────────────
+            $vendorCount = Vendor::where('workspace_id', $ownedWorkspace->id)->count();
+            if ($vendorCount === 0) {
+                return HelperFunction::response(
+                    null, null,
+                    'You must add at least one vendor before creating a job order. Please add a vendor to your workspace first.',
+                    'error', '011', Response::HTTP_UNPROCESSABLE_ENTITY
+                );
+            }
+
             // Field aliases mapping
             if (!$request->has('part_name') && $request->has('item_name')) {
                 $request->merge(['part_name' => $request->input('item_name')]);
@@ -44,13 +64,7 @@ class JobOrderController extends Controller
 
             // Auto-resolve workspace_id if omitted
             if (!$request->filled('workspace_id')) {
-                $workspace = Workspace::where(function ($q) use ($user) {
-                    $q->where('owner_id', $user->id)
-                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
-                })->first();
-                if ($workspace) {
-                    $request->merge(['workspace_id' => $workspace->id]);
-                }
+                $request->merge(['workspace_id' => $ownedWorkspace->id]);
             }
 
             $validation = Validator::make($request->all(), [
