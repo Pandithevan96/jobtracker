@@ -177,6 +177,7 @@ export const ChallanDetail: React.FC = () => {
 
   const itemsList = challan.items && challan.items.length > 0 ? challan.items : [];
   const totalQty = itemsList.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+  const grandTotalValue = itemsList.reduce((sum, item) => sum + (Number(item.total_value) || (Number(item.quantity || 0) * Number(item.unit_value || 0))), 0);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
