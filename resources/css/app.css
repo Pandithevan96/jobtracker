@@ -10,3 +10,19 @@
         "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
         "Noto Color Emoji";
 }
+
+/* Date input dark mode styling & calendar picker icon visibility */
+input[type="date"] {
+    color-scheme: dark;
+    cursor: pointer;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.8);
+    cursor: pointer;
+    opacity: 0.9;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    filter: invert(1);
+    opacity: 1;
+}
+

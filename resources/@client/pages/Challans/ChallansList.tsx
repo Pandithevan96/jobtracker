@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '@/services/apiClient';
 import { useAuth } from '@/context/AuthContext';
+import { DatePicker } from '@/components/DatePicker/DatePicker';
 import {
   Truck,
   Search,
@@ -499,15 +500,20 @@ export const ChallansList: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[#aaa] font-semibold mb-1">Dispatch Date</label>
-                  <input type="date" value={form.dispatch_date}
-                    onChange={(e) => setForm({ ...form, dispatch_date: e.target.value })}
-                    className={inputCls()} />
+                  <DatePicker
+                    value={form.dispatch_date}
+                    placeholder="Select dispatch date"
+                    onChange={(d) => setForm({ ...form, dispatch_date: d })}
+                  />
                 </div>
                 <div>
                   <label className="block text-[#aaa] font-semibold mb-1">Est. Delivery Date</label>
-                  <input type="date" value={form.estimated_delivery} min={form.dispatch_date}
-                    onChange={(e) => setForm({ ...form, estimated_delivery: e.target.value })}
-                    className={inputCls()} />
+                  <DatePicker
+                    value={form.estimated_delivery}
+                    min={form.dispatch_date}
+                    placeholder="Select delivery date"
+                    onChange={(d) => setForm({ ...form, estimated_delivery: d })}
+                  />
                 </div>
               </div>
 
