@@ -1,51 +1,182 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  Truck,
   ArrowLeft,
-  Download,
   CheckCircle2,
   Printer,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  Truck,
   Building2,
-  Calendar,
-  FileText
 } from 'lucide-react';
+import apiClient from '@/services/apiClient';
+import { useAuth } from '@/context/AuthContext';
+
+interface ChallanItem {
+  id?: number;
+  part_name: string;
+  part_number?: string;
+  quantity: number;
+  uom?: string;
+  unit_value?: number;
+  total_value?: number;
+  description?: string;
+}
+
+interface Vendor {
+  id: number;
+  shop_name: string;
+  contact_person?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  gst_number?: string;
+}
+
+interface Workspace {
+  id: number;
+  name: string;
+  address?: string;
+  gstin?: string;
+  phone?: string;
+}
+
+interface JobOrder {
+  id: number;
+  job_order_number?: string;
+  order_number?: string;
+  part_name?: string;
+  workspace?: Workspace;
+  vendor?: Vendor;
+}
+
+interface Challan {
+  id: number;
+  challan_number?: string;
+  dc_number?: string;
+  type: number | string;
+  status: number | string;
+  dispatch_date?: string;
+  estimated_delivery?: string;
+  vehicle_number?: string;
+  driver_name?: string;
+  notes?: string;
+  created_at?: string;
+  acknowledged_at?: string;
+  items?: ChallanItem[];
+  vendor?: Vendor;
+  job_order?: JobOrder;
+  workspace?: Workspace;
+}
 
 export const ChallanDetail: React.FC = () => {
+  const { appMode } = useAuth();
   const { id } = useParams<{ id: string }>();
-  const [acknowledged, setAcknowledged] = useState(false);
 
-  const challanData = {
-    challan_number: `DC-2026-042`,
-    date: '2026-07-28',
-    job_order_number: 'JO-2026-001',
-    type: 'OUTWARD DELIVERY CHALLAN',
-    transport_mode: 'Tempo Transport',
-    vehicle_number: 'TN 37 AB 1234',
-    sender: {
-      company: 'TechFab Precision Components',
-      address: 'Plot 42, SIDCO Industrial Estate, Coimbatore, TN 641021',
-      gstin: '33AAAAA0000A1Z5',
-      phone: '+91 98765 43210',
-    },
-    consignee: {
-      company: 'Apex Precision Engineering',
-      address: '14/B, Cross Cut Road, Peelamedu, Coimbatore, TN 641004',
-      gstin: '33BBBBB1111B2Z6',
-      contact: 'Mr. Ramesh (Plant Mgr)',
-    },
-    items: [
-      { sl: 1, part_no: 'P-10492', description: 'CNC Turned Shaft Pins Ø25 x 150mm', qty: 500, unit: 'Nos', weight: '125 kg' },
-      { sl: 2, part_no: 'P-10493', description: 'Matching Bush Connectors Brass', qty: 500, unit: 'Nos', weight: '45 kg' },
-      { sl: 3, part_no: 'T-8812', description: 'Special Fixture Jig Plate (Returnable)', qty: 2, unit: 'Sets', weight: '18 kg' },
-    ],
-    total_qty: 1002,
-    total_weight: '188 kg',
+  const [challan, setChallan] = useState<Challan | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [acknowledging, setAcknowledging] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const fetchChallan = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiClient.post('/challans/details', { id: Number(id) });
+      const data = res.data?.data ?? res.data;
+      setChallan(data);
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? 'Failed to load delivery challan details.');
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchChallan();
+  }, [fetchChallan]);
+
+  const handleAcknowledge = async () => {
+    if (!challan) return;
+    setAcknowledging(true);
+    try {
+      await apiClient.post('/challans/acknowledge', { id: challan.id });
+      await fetchChallan();
+    } catch (e: any) {
+      alert(e?.response?.data?.message ?? 'Failed to acknowledge delivery challan.');
+    } finally {
+      setAcknowledging(false);
+    }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrintOrPdf = async () => {
+    if (!challan) return;
+    setDownloadingPdf(true);
+    try {
+      const res = await apiClient.post('/challans/download-pdf', { id: challan.id });
+      const downloadUrl = res.data?.data?.download_url || res.data?.download_url;
+      if (downloadUrl) {
+        window.open(downloadUrl, '_blank');
+      } else {
+        window.print();
+      }
+    } catch {
+      // Fallback to browser native print
+      window.print();
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64 text-[#888]">
+        <Loader2 className="animate-spin mr-3" size={22} />
+        <span className="text-sm">Loading delivery challan details...</span>
+      </div>
+    );
+  }
+
+  if (error || !challan) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4 text-rose-400">
+        <AlertCircle size={32} />
+        <p className="text-sm">{error ?? 'Delivery challan not found.'}</p>
+        <button
+          onClick={fetchChallan}
+          className="flex items-center gap-2 text-xs bg-[#1a1a1a] border border-[#2a2a2a] px-4 py-2 rounded-xl hover:border-[#f5a623] transition-colors text-[#aaa]"
+        >
+          <RefreshCw size={14} /> Retry
+        </button>
+        <Link to="/challans" className="text-xs text-[#666] hover:text-white transition-colors">
+          ← Back to Delivery Challans
+        </Link>
+      </div>
+    );
+  }
+
+  const dcNumber = challan.challan_number || challan.dc_number || `DC-${challan.id}`;
+  const isOutward = String(challan.type) === '1' || String(challan.type).toLowerCase() === 'outward';
+  const isAcknowledged = String(challan.status) === '3' || String(challan.status).toLowerCase() === 'acknowledged' || !!challan.acknowledged_at;
+
+  const senderName = challan.job_order?.workspace?.name || challan.workspace?.name || 'Company Workspace';
+  const senderAddress = challan.job_order?.workspace?.address || challan.workspace?.address || 'Industrial Estate, India';
+  const senderGstin = challan.job_order?.workspace?.gstin || challan.workspace?.gstin || '—';
+  const senderPhone = challan.job_order?.workspace?.phone || challan.workspace?.phone || '—';
+
+  const consigneeName = challan.vendor?.shop_name || challan.job_order?.vendor?.shop_name || 'Vendor Company';
+  const consigneeAddress = challan.vendor?.address || challan.job_order?.vendor?.address || '—';
+  const consigneeGstin = challan.vendor?.gst_number || '—';
+  const consigneeContact = challan.vendor?.contact_person || challan.vendor?.phone || '—';
+
+  const joNumber = challan.job_order?.job_order_number || challan.job_order?.order_number || (challan.job_order_id ? `#${challan.job_order_id}` : '—');
+  const dispatchDateStr = challan.dispatch_date ? String(challan.dispatch_date).split('T')[0] : (challan.created_at ? String(challan.created_at).split('T')[0] : '—');
+
+  const itemsList = challan.items && challan.items.length > 0 ? challan.items : [];
+  const totalQty = itemsList.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -59,12 +190,14 @@ export const ChallanDetail: React.FC = () => {
         </Link>
 
         <div className="flex items-center gap-2">
-          {!acknowledged ? (
+          {!isAcknowledged ? (
             <button
-              onClick={() => setAcknowledged(true)}
-              className="bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs px-4 py-2 rounded-xl border-none cursor-pointer flex items-center gap-1.5 transition-colors"
+              onClick={handleAcknowledge}
+              disabled={acknowledging}
+              className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-black font-bold text-xs px-4 py-2 rounded-xl border-none cursor-pointer flex items-center gap-1.5 transition-colors"
             >
-              <CheckCircle2 size={16} /> Acknowledge Receipt
+              {acknowledging ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+              Acknowledge Receipt
             </button>
           ) : (
             <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1">
@@ -73,36 +206,38 @@ export const ChallanDetail: React.FC = () => {
           )}
 
           <button
-            onClick={handlePrint}
-            className="bg-[#222] hover:bg-[#2e2e2e] text-white font-bold text-xs px-4 py-2 rounded-xl border border-[#333] cursor-pointer flex items-center gap-1.5"
+            onClick={handlePrintOrPdf}
+            disabled={downloadingPdf}
+            className="bg-[#222] hover:bg-[#2e2e2e] text-white font-bold text-xs px-4 py-2 rounded-xl border border-[#333] cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
           >
-            <Printer size={16} /> Print / Download PDF
+            {downloadingPdf ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
+            Print / Download PDF
           </button>
         </div>
       </div>
 
       {/* Formal Challan Document Paper Card */}
       <div className="bg-white text-black rounded-2xl p-8 shadow-2xl border border-gray-200 font-sans print:p-0 print:border-none">
-        {/* Header Header */}
+        {/* Header */}
         <div className="flex justify-between items-start border-b border-gray-300 pb-6 mb-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-2xl">📋</span>
-              <h2 className="text-xl font-black text-gray-900 tracking-tight">{challanData.sender.company}</h2>
+              <Truck className="text-blue-600" size={24} />
+              <h2 className="text-xl font-black text-gray-900 tracking-tight">{senderName}</h2>
             </div>
-            <p className="text-xs text-gray-600 max-w-sm">{challanData.sender.address}</p>
+            <p className="text-xs text-gray-600 max-w-sm">{senderAddress}</p>
             <p className="text-xs text-gray-600 mt-1">
-              <strong>GSTIN:</strong> {challanData.sender.gstin} | <strong>Ph:</strong> {challanData.sender.phone}
+              <strong>GSTIN:</strong> {senderGstin} | <strong>Ph:</strong> {senderPhone}
             </p>
           </div>
 
           <div className="text-right">
-            <span className="inline-block bg-amber-500 text-black font-black text-xs px-3 py-1 rounded uppercase tracking-wider mb-2">
-              {challanData.type}
+            <span className={`inline-block font-black text-xs px-3 py-1 rounded uppercase tracking-wider mb-2 ${isOutward ? 'bg-amber-500 text-black' : 'bg-emerald-500 text-black'}`}>
+              {isOutward ? 'OUTWARD DELIVERY CHALLAN' : 'INWARD DELIVERY CHALLAN'}
             </span>
-            <h3 className="text-lg font-mono font-bold text-gray-900">{challanData.challan_number}</h3>
-            <p className="text-xs text-gray-600 font-mono">Date: {challanData.date}</p>
-            <p className="text-xs text-gray-600 font-mono">JO Ref: {challanData.job_order_number}</p>
+            <h3 className="text-lg font-mono font-bold text-gray-900">{dcNumber}</h3>
+            <p className="text-xs text-gray-600 font-mono">Date: {dispatchDateStr}</p>
+            <p className="text-xs text-gray-600 font-mono">JO Ref: {joNumber}</p>
           </div>
         </div>
 
@@ -110,23 +245,23 @@ export const ChallanDetail: React.FC = () => {
         <div className="grid grid-cols-2 gap-6 bg-gray-50 p-4 rounded-xl border border-gray-200 mb-6 text-xs">
           <div>
             <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Consignee / Deliver To:</span>
-            <p className="font-bold text-gray-900 text-sm">{challanData.consignee.company}</p>
-            <p className="text-gray-600">{challanData.consignee.address}</p>
+            <p className="font-bold text-gray-900 text-sm">{consigneeName}</p>
+            <p className="text-gray-600">{consigneeAddress}</p>
             <p className="text-gray-600 mt-1">
-              <strong>GSTIN:</strong> {challanData.consignee.gstin}
+              <strong>GSTIN:</strong> {consigneeGstin} | <strong>Contact:</strong> {consigneeContact}
             </p>
           </div>
 
           <div className="space-y-1">
             <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Dispatch Meta:</span>
             <p>
-              <strong className="text-gray-700">Mode of Transport:</strong> {challanData.transport_mode}
+              <strong className="text-gray-700">Vehicle Registration #:</strong> {challan.vehicle_number || '—'}
             </p>
             <p>
-              <strong className="text-gray-700">Vehicle Registration #:</strong> {challanData.vehicle_number}
+              <strong className="text-gray-700">Driver Name:</strong> {challan.driver_name || '—'}
             </p>
             <p>
-              <strong className="text-gray-700">Purpose:</strong> Subcontract Job Work / Processing
+              <strong className="text-gray-700">Notes / Purpose:</strong> {challan.notes || 'Subcontract Job Work / Processing'}
             </p>
           </div>
         </div>
@@ -141,29 +276,35 @@ export const ChallanDetail: React.FC = () => {
                 <th className="py-2.5 px-3">Material Description & Specification</th>
                 <th className="py-2.5 px-3 text-right">Quantity</th>
                 <th className="py-2.5 px-3 text-center">Unit</th>
-                <th className="py-2.5 px-3 text-right">Gross Weight</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {challanData.items.map((item) => (
-                <tr key={item.sl} className="text-gray-800">
-                  <td className="py-3 px-3 text-center font-mono text-gray-500">{item.sl}</td>
-                  <td className="py-3 px-3 font-mono font-bold text-gray-900">{item.part_no}</td>
-                  <td className="py-3 px-3 font-medium">{item.description}</td>
-                  <td className="py-3 px-3 text-right font-mono font-bold text-gray-900">{item.qty}</td>
-                  <td className="py-3 px-3 text-center font-semibold">{item.unit}</td>
-                  <td className="py-3 px-3 text-right font-mono text-gray-600">{item.weight}</td>
+              {itemsList.length > 0 ? (
+                itemsList.map((item, idx) => (
+                  <tr key={idx} className="text-gray-800">
+                    <td className="py-3 px-3 text-center font-mono text-gray-500">{idx + 1}</td>
+                    <td className="py-3 px-3 font-mono font-bold text-gray-900">{item.part_number || '—'}</td>
+                    <td className="py-3 px-3 font-medium">
+                      {item.part_name}
+                      {item.description ? <span className="block text-[11px] text-gray-500 font-normal">{item.description}</span> : null}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono font-bold text-gray-900">{item.quantity}</td>
+                    <td className="py-3 px-3 text-center font-semibold">{item.uom || 'Nos'}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="py-4 text-center text-gray-500">No line items in this challan</td>
                 </tr>
-              ))}
+              )}
             </tbody>
             <tfoot>
               <tr className="bg-gray-50 font-bold text-gray-900 border-t border-gray-300">
                 <td colSpan={3} className="py-3 px-3 text-right uppercase">
                   Total Dispatched Material:
                 </td>
-                <td className="py-3 px-3 text-right font-mono font-extrabold text-sm">{challanData.total_qty}</td>
-                <td className="py-3 px-3 text-center">Pcs</td>
-                <td className="py-3 px-3 text-right font-mono">{challanData.total_weight}</td>
+                <td className="py-3 px-3 text-right font-mono font-extrabold text-sm">{totalQty}</td>
+                <td className="py-3 px-3 text-center">Items</td>
               </tr>
             </tfoot>
           </table>
@@ -180,7 +321,7 @@ export const ChallanDetail: React.FC = () => {
 
           <div className="flex flex-col justify-between h-28 text-right">
             <div>
-              <p className="font-bold text-gray-900">For {challanData.sender.company}</p>
+              <p className="font-bold text-gray-900">For {senderName}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500 font-semibold">(Authorized Signatory / Gate Stamp)</p>
