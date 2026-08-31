@@ -271,43 +271,68 @@ export const ChallanDetail: React.FC = () => {
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-gray-100 border-b border-gray-300 text-gray-700 font-bold uppercase text-[10px]">
-                <th className="py-2.5 px-3 w-12 text-center">Sl #</th>
+                <th className="py-2.5 px-3 w-10 text-center">Sl #</th>
                 <th className="py-2.5 px-3">Part Code</th>
                 <th className="py-2.5 px-3">Material Description & Specification</th>
+                <th className="py-2.5 px-3 text-center">HSN/SAC</th>
                 <th className="py-2.5 px-3 text-right">Quantity</th>
                 <th className="py-2.5 px-3 text-center">Unit</th>
+                <th className="py-2.5 px-3 text-right">Rate (₹)</th>
+                <th className="py-2.5 px-3 text-right">Total (₹)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {itemsList.length > 0 ? (
-                itemsList.map((item, idx) => (
-                  <tr key={idx} className="text-gray-800">
-                    <td className="py-3 px-3 text-center font-mono text-gray-500">{idx + 1}</td>
-                    <td className="py-3 px-3 font-mono font-bold text-gray-900">{item.part_number || '—'}</td>
-                    <td className="py-3 px-3 font-medium">
-                      {item.part_name}
-                      {item.description ? <span className="block text-[11px] text-gray-500 font-normal">{item.description}</span> : null}
-                    </td>
-                    <td className="py-3 px-3 text-right font-mono font-bold text-gray-900">{item.quantity}</td>
-                    <td className="py-3 px-3 text-center font-semibold">{item.uom || 'Nos'}</td>
-                  </tr>
-                ))
+                itemsList.map((item, idx) => {
+                  const lineTotal = Number(item.total_value) || (Number(item.quantity || 0) * Number(item.unit_value || 0));
+                  return (
+                    <tr key={idx} className="text-gray-800">
+                      <td className="py-3 px-3 text-center font-mono text-gray-500">{idx + 1}</td>
+                      <td className="py-3 px-3 font-mono font-bold text-gray-900">{item.part_number || '—'}</td>
+                      <td className="py-3 px-3 font-medium">
+                        {item.part_name}
+                        {item.description ? <span className="block text-[11px] text-gray-500 font-normal">{item.description}</span> : null}
+                      </td>
+                      <td className="py-3 px-3 text-center font-mono text-gray-600">{item.hsn_code || '—'}</td>
+                      <td className="py-3 px-3 text-right font-mono font-bold text-gray-900">{item.quantity}</td>
+                      <td className="py-3 px-3 text-center font-semibold">{item.uom || 'Nos'}</td>
+                      <td className="py-3 px-3 text-right font-mono text-gray-700">
+                        {item.unit_value ? `₹${Number(item.unit_value).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono font-bold text-gray-900">
+                        {lineTotal > 0 ? `₹${lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan={5} className="py-4 text-center text-gray-500">No line items in this challan</td>
+                  <td colSpan={8} className="py-4 text-center text-gray-500">No line items in this challan</td>
                 </tr>
               )}
             </tbody>
             <tfoot>
               <tr className="bg-gray-50 font-bold text-gray-900 border-t border-gray-300">
-                <td colSpan={3} className="py-3 px-3 text-right uppercase">
-                  Total Dispatched Material:
+                <td colSpan={4} className="py-3 px-3 text-right uppercase">
+                  Grand Total:
                 </td>
                 <td className="py-3 px-3 text-right font-mono font-extrabold text-sm">{totalQty}</td>
                 <td className="py-3 px-3 text-center">Items</td>
+                <td className="py-3 px-3"></td>
+                <td className="py-3 px-3 text-right font-mono font-extrabold text-sm text-emerald-700">
+                  {grandTotalValue > 0 ? `₹${grandTotalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                </td>
               </tr>
             </tfoot>
           </table>
+        </div>
+
+        {/* GST Terms & Declaration Box */}
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 mb-6 text-[11px] text-gray-600 leading-relaxed space-y-1">
+          <p className="font-bold text-gray-900 uppercase tracking-wider text-[10px]">Terms &amp; GST Rule 55 Declaration:</p>
+          <p>1. Issued under <strong>Rule 55 of CGST Rules, 2017</strong> &amp; <strong>Section 143 of CGST Act, 2017</strong> for job work processing.</p>
+          <p>2. Values declared are for transit insurance and GST compliance purposes (this is a Delivery Challan for job work movement, not a sales invoice).</p>
+          <p>3. Goods must be processed and returned to the Principal workspace within 1 year from dispatch date.</p>
         </div>
 
         {/* Declarations & Signatures */}

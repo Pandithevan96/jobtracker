@@ -50,14 +50,18 @@ interface JobOrder {
 interface ChallanFormItem {
   part_name: string;
   part_number: string;
+  hsn_code?: string;
   quantity: number;
+  unit_value?: number;
   uom: string;
 }
 
 const emptyItem = (): ChallanFormItem => ({
   part_name: '',
   part_number: '',
+  hsn_code: '',
   quantity: 1,
+  unit_value: 0,
   uom: 'Nos',
 });
 
@@ -236,7 +240,9 @@ export const ChallansList: React.FC = () => {
         items: items.map((it) => ({
           part_name: it.part_name.trim(),
           part_number: it.part_number.trim() || undefined,
+          hsn_code: it.hsn_code?.trim() || undefined,
           quantity: Number(it.quantity),
+          unit_value: Number(it.unit_value || 0),
           uom: it.uom,
         })),
       };
@@ -566,12 +572,20 @@ export const ChallansList: React.FC = () => {
                           />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-3 gap-2">
                         <div>
                           <label className="block text-[#888] mb-0.5">Quantity *</label>
                           <input type="number" min={1}
                             value={item.quantity}
                             onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))}
+                            className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg text-white px-3 py-2 text-[11px] focus:outline-none focus:border-[#f5a623]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[#888] mb-0.5">Unit Rate (₹)</label>
+                          <input type="number" min={0} step="0.01" placeholder="0.00"
+                            value={item.unit_value || ''}
+                            onChange={(e) => updateItem(idx, 'unit_value', Number(e.target.value))}
                             className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg text-white px-3 py-2 text-[11px] focus:outline-none focus:border-[#f5a623]"
                           />
                         </div>
@@ -584,6 +598,14 @@ export const ChallansList: React.FC = () => {
                             ))}
                           </select>
                         </div>
+                      </div>
+                      <div>
+                        <label className="block text-[#888] mb-0.5">HSN / SAC Code</label>
+                        <input type="text" placeholder="e.g. 8483"
+                          value={item.hsn_code || ''}
+                          onChange={(e) => updateItem(idx, 'hsn_code', e.target.value)}
+                          className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg text-white px-3 py-2 text-[11px] focus:outline-none focus:border-[#f5a623]"
+                        />
                       </div>
                     </div>
                   ))}
