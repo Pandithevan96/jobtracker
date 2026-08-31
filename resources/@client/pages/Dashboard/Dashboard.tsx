@@ -493,31 +493,33 @@ export const Dashboard: React.FC = () => {
                                     </p>
                                 ) : (
                                     <div className="space-y-3">
-                                        {recentChallans.map((dc) => (
+                                        {recentChallans.map((dc: any) => (
                                             <div
                                                 key={dc.id}
                                                 className="bg-[#1a1a1a] border border-[#2a2a2a] p-3 rounded-xl"
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <span className="font-mono font-bold text-xs text-white">
-                                                        {dc.challan_number}
+                                                        {dc.challan_number || dc.dc_number || `DC-${dc.id}`}
                                                     </span>
                                                     <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded font-bold uppercase">
-                                                        {dc.type || "—"}
+                                                        {String(dc.type) === '1' ? 'Outward' : String(dc.type) === '2' ? 'Inward' : (dc.type || "—")}
                                                     </span>
                                                 </div>
                                                 <div className="text-xs text-[#888] mt-1 flex justify-between">
                                                     <span>
-                                                        {dc.vendor || "—"}
+                                                        {typeof dc.vendor === 'object' && dc.vendor !== null
+                                                            ? (dc.vendor.shop_name || "—")
+                                                            : (dc.vendor || dc.vendor_name || "—")}
                                                     </span>
                                                     <span>
-                                                        {dc.items_count ?? 0}{" "}
+                                                        {dc.items_count ?? dc.items?.length ?? 0}{" "}
                                                         Line Items
                                                     </span>
                                                 </div>
                                                 <div className="mt-2 pt-2 border-t border-[#262626] flex items-center justify-between text-[11px]">
                                                     <span className="text-[#666]">
-                                                        {dc.date || "—"}
+                                                        {dc.dispatch_date ? String(dc.dispatch_date).split('T')[0] : (dc.date || "—")}
                                                     </span>
                                                     {getStatusBadge(dc.status)}
                                                 </div>
