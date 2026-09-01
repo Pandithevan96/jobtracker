@@ -108,8 +108,12 @@ const STATUS_MAP: Record<number, { label: string; color: string }> = {
   4: { label: 'Ready for Pickup',   color: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
   5: { label: 'Dispatched Back',   color: 'bg-purple-500/15 text-purple-400 border-purple-500/30' },
   6: { label: 'Completed',         color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
-  7: { label: 'Cancelled',         color: 'bg-rose-500/15 text-rose-400 border-rose-500/30' },
+  7: { label: 'Cancelled',         color: 'bg-rose-500/10 text-rose-400 border-rose-500/30' },
 };
+
+function statusInfo(s: number) {
+  return STATUS_MAP[s] ?? { label: `Status ${s}`, color: 'bg-[#333]/40 text-[#aaa] border-[#444]' };
+}
 
 function parseTimestamp(ts?: string | null): number {
   if (!ts) return 0;
