@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   FileText,
@@ -10,6 +10,10 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
+  Paperclip,
+  Image as ImageIcon,
+  ExternalLink,
+  X,
 } from 'lucide-react';
 import apiClient from '@/services/apiClient';
 import { useAuth } from '@/context/AuthContext';
@@ -45,6 +49,9 @@ interface OrderNote {
   created_at: string;
   user_id?: number;
   author_role?: number;
+  attachment_url?: string | null;
+  attachment_name?: string | null;
+  attachment_type?: string | null;
   user: NoteUser | null;
 }
 
@@ -95,6 +102,9 @@ interface AuditFeedItem {
   createdAt: string;
   statusLabel?: string;
   statusColor?: string;
+  attachmentUrl?: string | null;
+  attachmentName?: string | null;
+  attachmentType?: string | null;
 }
 
 // ─── Status helpers (matching backend JobOrder constants) ───────────────────
@@ -168,6 +178,9 @@ function getAuditFeed(order: JobOrder): AuditFeedItem[] {
         authorRole: n.author_role,
         userId: n.user_id || n.user?.id,
         createdAt: n.created_at || new Date().toISOString(),
+        attachmentUrl: n.attachment_url,
+        attachmentName: n.attachment_name,
+        attachmentType: n.attachment_type,
       });
     }
   });
@@ -182,27 +195,26 @@ export const JobOrderDetail: React.FC = () => {
   const { user, appMode } = useAuth();
   const { id } = useParams<{ id: string }>();
 
-  const [order, setOrder]       = useState<JobOrder | null>(null);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<string | null>(null);
-  const [newNote, setNewNote]   = useState('');
-  const [sending, setSending]   = useState(false);
-  const [updating, setUpdating] = useState(false);
-  const notesEndRef             = React.useRef<HTMLDivElement>(null);
+  const [order, setOrder]         = useState<JobOrder | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState<string | null>(null);
+  const [newNote, setNewNote]     = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [sending, setSending]     = useState(false);
+  const [updating, setUpdating]   = useState(false);
+  
+  const notesEndRef               = useRef<HTMLDivElement>(null);
+  const fileInputRef              = useRef<HTMLInputElement>(null);
 
   // ── Fetch order details ──────────────────────────────────────────────────
   const fetchOrder = useCallback(async (showSpinner = true) => {
     if (!id) return;
-    if (showSpinner) {
-      setLoading(true);
-      setError(null);
-    }
+    if (showSpinner) setLoading(true);
+    setError(null);
     try {
       const res = await apiClient.post('/job-orders/details', { id: Number(id) });
       const data = res.data?.data ?? res.data;
-      if (data && (data.id || data.order_number)) {
-        setOrder(data);
-      }
+      setOrder(data);
     } catch (e: any) {
       if (showSpinner) setError(e?.response?.data?.message ?? 'Failed to load job order.');
     } finally {
@@ -238,38 +250,50 @@ export const JobOrderDetail: React.FC = () => {
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
     const noteText = newNote.trim();
-    if (!noteText || !order) return;
+    if ((!noteText && !selectedFile) || !order) return;
     setSending(true);
-    // Optimistically append so UI is instant
-    const tempId = Date.now();
-    const noteObj: OrderNote = {
-      id: tempId,
-      note: noteText,
-      created_at: new Date().toISOString(),
-      user_id: user?.id,
-      author_role: appMode === 'vendor' ? 2 : 1,
-      user: user ? { id: user.id, name: user.name } : null,
-    };
-    setOrder((prev) => {
-      if (!prev) return prev;
-      const existing = prev.order_notes || prev.orderNotes || [];
-      const updated = [...existing, noteObj];
-      return { ...prev, order_notes: updated, orderNotes: updated };
-    });
-    setNewNote('');
+
     try {
-      await apiClient.post('/job-orders/add-note', { id: order.id, note: noteText });
-      // Replace temp optimistic note with confirmed server data
-      await fetchOrder(false);
-    } catch (e: any) {
-      // Roll back optimistic update on error
+      const formData = new FormData();
+      formData.append('id', String(order.id));
+      if (noteText) formData.append('note', noteText);
+      if (selectedFile) formData.append('attachment', selectedFile);
+
+      const fileObj = selectedFile;
+      const fileUrl = selectedFile ? URL.createObjectURL(selectedFile) : null;
+      const fileType = selectedFile ? (selectedFile.type.startsWith('image/') ? 'image' : selectedFile.type.includes('pdf') ? 'pdf' : 'file') : null;
+
+      setNewNote('');
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+
+      const res = await apiClient.post('/job-orders/add-note', formData);
+      const createdNote = res.data?.data ?? res.data;
+
+      const noteObj: OrderNote = (createdNote && createdNote.id) ? createdNote : {
+        id: Date.now(),
+        note: noteText,
+        created_at: new Date().toISOString(),
+        user_id: user?.id,
+        author_role: appMode === 'vendor' ? 2 : 1,
+        attachment_url: createdNote?.attachment_url || fileUrl,
+        attachment_name: createdNote?.attachment_name || fileObj?.name,
+        attachment_type: createdNote?.attachment_type || fileType,
+        user: user ? { id: user.id, name: user.name } : null,
+      };
+
       setOrder((prev) => {
         if (!prev) return prev;
         const existing = prev.order_notes || prev.orderNotes || [];
-        const rolledBack = existing.filter((n: any) => n.id !== tempId);
-        return { ...prev, order_notes: rolledBack, orderNotes: rolledBack };
+        return {
+          ...prev,
+          orderNotes: [...existing, noteObj],
+          order_notes: [...existing, noteObj],
+        };
       });
-      setNewNote(noteText);
+
+      fetchOrder(false);
+    } catch (e: any) {
       alert(e?.response?.data?.message ?? 'Failed to add note.');
     } finally {
       setSending(false);
@@ -294,6 +318,61 @@ export const JobOrderDetail: React.FC = () => {
     return null;
   };
 
+  const renderAttachment = (item: AuditFeedItem) => {
+    if (!item.attachmentUrl) return null;
+
+    const isImage = item.attachmentType === 'image' || /\.(jpg|jpeg|png|gif|webp)$/i.test(item.attachmentUrl);
+    const isPdf = item.attachmentType === 'pdf' || /\.pdf$/i.test(item.attachmentUrl);
+
+    if (isImage) {
+      return (
+        <div className="mt-2">
+          <a
+            href={item.attachmentUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block max-w-xs overflow-hidden rounded-xl border border-[#333] hover:opacity-90 transition-opacity"
+          >
+            <img src={item.attachmentUrl} alt={item.attachmentName ?? 'Attachment Photo'} className="max-h-48 object-cover rounded-xl w-full" />
+          </a>
+          {item.attachmentName && <span className="text-[10px] text-[#888] mt-1 block">{item.attachmentName}</span>}
+        </div>
+      );
+    }
+
+    if (isPdf) {
+      return (
+        <div className="mt-2">
+          <a
+            href={item.attachmentUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-[#333] hover:border-[#f5a623] text-gray-200 text-xs rounded-xl transition-colors no-underline"
+          >
+            <FileText size={16} className="text-rose-400" />
+            <span className="truncate max-w-[180px] font-semibold">{item.attachmentName ?? 'Document.pdf'}</span>
+            <ExternalLink size={12} className="text-[#888]" />
+          </a>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mt-2">
+        <a
+          href={item.attachmentUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-[#333] hover:border-[#f5a623] text-gray-200 text-xs rounded-xl transition-colors no-underline"
+        >
+          <Paperclip size={16} className="text-amber-400" />
+          <span className="truncate max-w-[180px] font-semibold">{item.attachmentName ?? 'Attachment'}</span>
+          <ExternalLink size={12} className="text-[#888]" />
+        </a>
+      </div>
+    );
+  };
+
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -311,7 +390,7 @@ export const JobOrderDetail: React.FC = () => {
         <AlertCircle size={32} />
         <p className="text-sm">{error ?? 'Job order not found.'}</p>
         <button
-          onClick={fetchOrder}
+          onClick={() => fetchOrder(true)}
           className="flex items-center gap-2 text-xs bg-[#1a1a1a] border border-[#2a2a2a] px-4 py-2 rounded-xl hover:border-[#f5a623] transition-colors text-[#aaa]"
         >
           <RefreshCw size={14} /> Retry
@@ -592,7 +671,8 @@ export const JobOrderDetail: React.FC = () => {
                           {new Date(item.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                         </span>
                       </div>
-                      <p className="whitespace-pre-wrap leading-relaxed">{item.text}</p>
+                      {item.text && <p className="whitespace-pre-wrap leading-relaxed">{item.text}</p>}
+                      {renderAttachment(item)}
                     </div>
                   );
                 })
@@ -600,29 +680,72 @@ export const JobOrderDetail: React.FC = () => {
                 <div className="text-center py-8 space-y-1.5">
                   <MessageSquare size={24} className="mx-auto text-[#444]" />
                   <p className="text-xs text-[#888]">No notes yet. Add the first update below.</p>
-                  <p className="text-[10px] text-[#555]">Messages are shared between Principal (Sender) and Vendor (Receiver).</p>
+                  <p className="text-[10px] text-[#555]">Messages and photos/PDFs are shared between Principal and Vendor.</p>
                 </div>
               )}
               <div ref={notesEndRef} />
             </div>
           </div>
 
-          <form onSubmit={handleAddNote} className="flex gap-2 pt-2 border-t border-[#222]">
-            <input
-              type="text"
-              placeholder="Add progress note or message..."
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              disabled={sending}
-              className="flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-xs px-3.5 py-2 text-white focus:outline-none focus:border-[#f5a623] disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={sending || !newNote.trim()}
-              className="bg-[#f5a623] hover:bg-[#e0951c] disabled:opacity-50 text-black font-bold p-2.5 rounded-xl border-none cursor-pointer flex items-center justify-center transition-colors"
-            >
-              {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-            </button>
+          <form onSubmit={handleAddNote} className="space-y-2 pt-2 border-t border-[#222]">
+            {selectedFile && (
+              <div className="flex items-center justify-between bg-[#1a1a1a] border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs text-amber-300">
+                <div className="flex items-center gap-2 truncate">
+                  {selectedFile.type.startsWith('image/') ? (
+                    <ImageIcon size={14} className="text-amber-400 flex-shrink-0" />
+                  ) : (
+                    <FileText size={14} className="text-rose-400 flex-shrink-0" />
+                  )}
+                  <span className="truncate font-semibold">{selectedFile.name}</span>
+                  <span className="text-[10px] text-[#888]">({(selectedFile.size / 1024).toFixed(1)} KB)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedFile(null)}
+                  className="text-[#888] hover:text-white bg-transparent border-none cursor-pointer p-0.5"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    setSelectedFile(e.target.files[0]);
+                  }
+                }}
+                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.dwg"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={sending}
+                title="Attach Photo or PDF"
+                className="bg-[#1a1a1a] hover:bg-[#252525] border border-[#2a2a2a] text-[#aaa] hover:text-white p-2.5 rounded-xl cursor-pointer flex items-center justify-center transition-colors disabled:opacity-50"
+              >
+                <Paperclip size={16} />
+              </button>
+              <input
+                type="text"
+                placeholder="Add progress note or message..."
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                disabled={sending}
+                className="flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-xs px-3.5 py-2 text-white focus:outline-none focus:border-[#f5a623] disabled:opacity-50"
+              />
+              <button
+                type="submit"
+                disabled={sending || (!newNote.trim() && !selectedFile)}
+                className="bg-[#f5a623] hover:bg-[#e0951c] disabled:opacity-50 text-black font-bold p-2.5 rounded-xl border-none cursor-pointer flex items-center justify-center transition-colors"
+              >
+                {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+              </button>
+            </div>
           </form>
         </div>
       </div>
@@ -631,3 +754,6 @@ export const JobOrderDetail: React.FC = () => {
 };
 
 export default JobOrderDetail;
+
+
+

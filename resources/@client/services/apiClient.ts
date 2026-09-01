@@ -34,12 +34,17 @@ export const apiClient = {
         const token = localStorage.getItem("auth_token");
         const appMode = localStorage.getItem("app_mode") || "principal";
 
+        const isFormData = body instanceof FormData;
+
         const reqHeaders: Record<string, string> = {
-            "Content-Type": "application/json",
             Accept: "application/json",
             "X-App-Mode": appMode,
             ...customHeaders,
         };
+
+        if (!isFormData) {
+            reqHeaders["Content-Type"] = "application/json";
+        }
 
         if (token) {
             reqHeaders["Authorization"] = `Bearer ${token}`;
@@ -53,7 +58,7 @@ export const apiClient = {
             const response = await fetch(url, {
                 method,
                 headers: reqHeaders,
-                body: body ? JSON.stringify(body) : undefined,
+                body: isFormData ? body : (body ? JSON.stringify(body) : undefined),
             });
 
             if (response.status === 401) {

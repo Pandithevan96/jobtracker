@@ -439,12 +439,17 @@ class JobOrderController extends Controller
             }
 
             $validation = Validator::make($request->all(), [
-                'id'   => 'required|integer|exists:job_orders,id',
-                'note' => 'required|string|max:1000',
+                'id'         => 'required|integer|exists:job_orders,id',
+                'note'       => 'nullable|string|max:1000',
+                'attachment' => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,dwg|max:10240',
             ]);
 
             if ($validation->fails()) {
                 return HelperFunction::response(null, null, $validation->errors()->first(), 'error', '001', Response::HTTP_BAD_REQUEST);
+            }
+
+            if (!$request->filled('note') && !$request->hasFile('attachment')) {
+                return HelperFunction::response(null, null, 'Please enter a note or attach a photo/PDF.', 'error', '001', Response::HTTP_BAD_REQUEST);
             }
 
             $user     = Auth::user();
@@ -461,13 +466,35 @@ class JobOrderController extends Controller
                 return HelperFunction::response(null, null, 'You do not have access to this job order', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
+            $attachmentUrl  = null;
+            $attachmentName = null;
+            $attachmentType = null;
+
+            if ($request->hasFile('attachment')) {
+                $file = $request->file('attachment');
+                $path = $file->store('note_attachments', 'public');
+                $attachmentUrl  = Storage::url($path);
+                $attachmentName = $file->getClientOriginalName();
+                $ext = strtolower($file->getClientOriginalExtension());
+                if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+                    $attachmentType = 'image';
+                } elseif ($ext === 'pdf') {
+                    $attachmentType = 'pdf';
+                } else {
+                    $attachmentType = 'file';
+                }
+            }
+
             $authorRole = $user->isVendor() ? JobOrderNote::ROLE_VENDOR : JobOrderNote::ROLE_PRINCIPAL;
 
             $note = JobOrderNote::create([
-                'job_order_id' => $jobOrder->id,
-                'user_id'      => $user->id,
-                'note'         => $request->input('note'),
-                'author_role'  => $authorRole,
+                'job_order_id'    => $jobOrder->id,
+                'user_id'         => $user->id,
+                'note'            => $request->input('note') ?? '',
+                'author_role'     => $authorRole,
+                'attachment_url'  => $attachmentUrl,
+                'attachment_name' => $attachmentName,
+                'attachment_type' => $attachmentType,
             ]);
 
             return HelperFunction::response($note->load('user'), null, 'Note added successfully', 'success', '000', Response::HTTP_CREATED);

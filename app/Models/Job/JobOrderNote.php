@@ -19,6 +19,9 @@ class JobOrderNote extends Model
         'user_id',
         'note',
         'author_role',
+        'attachment_url',
+        'attachment_name',
+        'attachment_type',
     ];
 
     protected $casts = [
