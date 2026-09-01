@@ -134,13 +134,24 @@ function parseTimestamp(ts?: string | null): number {
   return isNaN(t) ? 0 : t;
 }
 
-function getFullFileUrl(rawUrl?: string | null): string {
-  if (!rawUrl) return '';
-  if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('blob:') || rawUrl.startsWith('data:')) {
-    return rawUrl;
+function getFullFileUrl(rawUrl?: string | null, rawName?: string | null): string {
+  if (!rawUrl && !rawName) return '';
+  let url = (rawUrl || '').trim();
+  if (!url && rawName) {
+    url = `/storage/note_attachments/${rawName}`;
   }
-  const base = 'https://jobtracker-adjt.onrender.com';
-  return `${base}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
+    return url;
+  }
+  const cleanPath = url.startsWith('/') ? url : `/${url}`;
+  const origin = (typeof window !== 'undefined' && window.location && window.location.origin) 
+    ? window.location.origin 
+    : 'https://jobtracker-adjt.onrender.com';
+    
+  if (origin && !origin.includes('localhost:5173')) {
+    return `${origin}${cleanPath}`;
+  }
+  return `https://jobtracker-adjt.onrender.com${cleanPath}`;
 }
 
 function getAuditFeed(order: JobOrder): AuditFeedItem[] {
@@ -148,14 +159,29 @@ function getAuditFeed(order: JobOrder): AuditFeedItem[] {
 
   // 1. Initial Job Order Notes (typed when order was created)
   if (order.notes && order.notes.trim()) {
+    const initialText = order.notes.trim();
+    let attUrl: string | undefined;
+    let attName: string | undefined;
+    let attType: string | undefined;
+
+    if (/\.(jpg|jpeg|png|gif|webp|pdf|dwg|doc|docx)$/i.test(initialText)) {
+      attName = initialText;
+      attUrl = `/storage/job_documents/${initialText}`;
+      if (/\.(jpg|jpeg|png|gif|webp)$/i.test(initialText)) attType = 'image';
+      else if (/\.pdf$/i.test(initialText)) attType = 'pdf';
+    }
+
     items.push({
       id: `initial-note-${order.id}`,
       type: 'initial_note',
-      text: order.notes.trim(),
+      text: initialText,
       authorName: order.creator?.name ?? 'Principal',
       authorRole: 1, // Principal
       userId: order.creator?.id,
       createdAt: order.created_at || new Date().toISOString(),
+      attachmentUrl: attUrl,
+      attachmentName: attName,
+      attachmentType: attType,
     });
   }
 
@@ -182,6 +208,18 @@ function getAuditFeed(order: JobOrder): AuditFeedItem[] {
   notes.forEach((n) => {
     if (n && (!n.id || !seenIds.has(n.id))) {
       if (n.id) seenIds.add(n.id);
+      let attUrl = n.attachment_url || (n as any).attachmentUrl || (n as any).fileUrl || (n as any).url;
+      let attName = n.attachment_name || (n as any).attachmentName || (n as any).original_name;
+      let attType = n.attachment_type || (n as any).attachmentType;
+
+      const noteText = (n.note || '').trim();
+      if (!attUrl && noteText && /\.(jpg|jpeg|png|gif|webp|pdf|dwg|doc|docx)$/i.test(noteText)) {
+        attName = attName || noteText;
+        attUrl = `/storage/note_attachments/${noteText}`;
+        if (/\.(jpg|jpeg|png|gif|webp)$/i.test(noteText)) attType = 'image';
+        else if (/\.pdf$/i.test(noteText)) attType = 'pdf';
+      }
+
       items.push({
         id: `order-note-${n.id || Math.random()}`,
         type: 'order_note',
@@ -190,9 +228,33 @@ function getAuditFeed(order: JobOrder): AuditFeedItem[] {
         authorRole: n.author_role,
         userId: n.user_id || n.user?.id,
         createdAt: n.created_at || new Date().toISOString(),
-        attachmentUrl: n.attachment_url,
-        attachmentName: n.attachment_name,
-        attachmentType: n.attachment_type,
+        attachmentUrl: attUrl,
+        attachmentName: attName,
+        attachmentType: attType,
+      });
+    }
+  });
+
+  // 4. Drawing Documents (drawing_urls)
+  const drawings = (order as any).drawing_urls || [];
+  drawings.forEach((doc: any, idx: number) => {
+    if (doc) {
+      const docUrl = doc.url || doc.path || '';
+      const docName = doc.original_name || `document_${idx + 1}`;
+      let docType = 'file';
+      if (/\.(jpg|jpeg|png|gif|webp)$/i.test(docUrl || docName)) docType = 'image';
+      if (/\.pdf$/i.test(docUrl || docName)) docType = 'pdf';
+
+      items.push({
+        id: `drawing-doc-${idx}`,
+        type: 'order_note',
+        text: `Attached Document: ${docName}`,
+        authorName: 'Order Document',
+        authorRole: 1,
+        createdAt: doc.uploaded_at || order.created_at || new Date().toISOString(),
+        attachmentUrl: docUrl,
+        attachmentName: docName,
+        attachmentType: docType,
       });
     }
   });
@@ -339,38 +401,207 @@ export const JobOrderDetail: React.FC = () => {
     return null;
   };
 
-  const renderAttachment = (item: AuditFeedItem) => {
-    if (!item.attachmentUrl) return null;
+interface FilePreviewModalProps {
+  file: {
+    url: string;
+    name: string;
+    type: 'image' | 'pdf' | 'file';
+  } | null;
+  onClose: () => void;
+}
 
-    const fullUrl = getFullFileUrl(item.attachmentUrl);
-    const isImage = item.attachmentType === 'image' || /\.(jpg|jpeg|png|gif|webp)$/i.test(item.attachmentUrl);
-    const isPdf = item.attachmentType === 'pdf' || /\.pdf$/i.test(item.attachmentUrl);
+const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, onClose }) => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
+  const backdropRef            = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!file) return;
+    setLoading(true);
+    setError(null);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [file, onClose]);
+
+  if (!file) return null;
+
+  return (
+    <div
+      ref={backdropRef}
+      onClick={(e) => {
+        if (e.target === backdropRef.current) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in"
+    >
+      <div className="bg-[#141414] border border-[#2a2a2a] rounded-2xl max-w-4xl w-full flex flex-col overflow-hidden shadow-2xl max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#222] bg-[#181818]">
+          <div className="flex items-center gap-2.5 truncate">
+            {file.type === 'image' ? (
+              <ImageIcon size={18} className="text-amber-400 flex-shrink-0" />
+            ) : (
+              <FileText size={18} className="text-rose-400 flex-shrink-0" />
+            )}
+            <span className="font-bold text-white text-sm truncate" title={file.name}>
+              {file.name}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <a
+              href={file.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              download={file.name}
+              className="px-3 py-1.5 bg-[#222] hover:bg-[#333] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors no-underline"
+            >
+              <Download size={14} /> Download
+            </a>
+            <a
+              href={file.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 bg-[#222] hover:bg-[#333] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors no-underline"
+            >
+              <ExternalLink size={14} /> Open in New Tab
+            </a>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 text-[#888] hover:text-white bg-[#222] hover:bg-rose-500/20 hover:text-rose-400 rounded-lg border-none cursor-pointer transition-colors ml-1"
+              title="Close (Esc)"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Modal Body */}
+        <div className="p-4 flex-1 overflow-auto flex items-center justify-center bg-[#0a0a0a] min-h-[350px] relative">
+          {/* Loading Spinner */}
+          {loading && !error && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0a0a] z-10 gap-3 text-amber-400">
+              <Loader2 size={32} className="animate-spin" />
+              <span className="text-xs text-gray-300 font-semibold">Fetching file preview…</span>
+            </div>
+          )}
+
+          {/* Error Banner */}
+          {error && (
+            <div className="p-6 text-center space-y-3 max-w-md bg-[#181818] border border-rose-500/30 rounded-2xl">
+              <AlertCircle size={36} className="mx-auto text-rose-400" />
+              <h4 className="text-sm font-bold text-white">Preview Unavailable</h4>
+              <p className="text-xs text-gray-400 leading-relaxed">{error}</p>
+              <div className="pt-2 flex justify-center gap-3">
+                <a
+                  href={file.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download={file.name}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs rounded-xl no-underline transition-colors flex items-center gap-1.5"
+                >
+                  <Download size={14} /> Download File
+                </a>
+                <a
+                  href={file.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-[#2a2a2a] hover:bg-[#333] text-white text-xs font-semibold rounded-xl no-underline transition-colors flex items-center gap-1.5"
+                >
+                  <ExternalLink size={14} /> Open Link
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Image */}
+          {!error && file.type === 'image' && (
+            <img
+              src={file.url}
+              alt={file.name}
+              onLoad={() => setLoading(false)}
+              onError={() => {
+                setLoading(false);
+                setError('Failed to load image preview. The file link may be invalid or moved.');
+              }}
+              className="max-h-[75vh] max-w-full object-contain rounded-lg shadow-2xl transition-opacity duration-300"
+              style={{ opacity: loading ? 0 : 1 }}
+            />
+          )}
+
+          {/* PDF */}
+          {!error && file.type === 'pdf' && (
+            <iframe
+              src={file.url}
+              title={file.name}
+              onLoad={() => setLoading(false)}
+              onError={() => {
+                setLoading(false);
+                setError('Unable to embed PDF viewer. Tap "Open in New Tab" or "Download" above to view document.');
+              }}
+              className="w-full h-[75vh] rounded-lg border-none bg-white shadow-xl"
+            />
+          )}
+
+          {/* Generic File */}
+          {!error && file.type === 'file' && (
+            <div className="text-center py-12 space-y-4 text-gray-300">
+              <Paperclip size={40} className="mx-auto text-amber-400" />
+              <div>
+                <p className="text-sm font-bold text-white">{file.name}</p>
+                <p className="text-xs text-[#888] mt-1">Direct preview is available for images and PDF files.</p>
+              </div>
+              <a
+                href={file.url}
+                download={file.name}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs rounded-xl no-underline transition-colors"
+              >
+                <Download size={16} /> Download File
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+  const renderAttachment = (item: AuditFeedItem) => {
+    const fullUrl = getFullFileUrl(item.attachmentUrl, item.attachmentName);
+    if (!fullUrl && !item.attachmentName) return null;
+
+    const isImage = item.attachmentType === 'image' || /\.(jpg|jpeg|png|gif|webp)$/i.test(fullUrl || item.attachmentName || '');
+    const isPdf   = item.attachmentType === 'pdf' || /\.pdf$/i.test(fullUrl || item.attachmentName || '');
+    const fileName = item.attachmentName || item.text || 'File Attachment';
 
     if (isImage) {
       return (
         <div className="mt-2 space-y-1">
           <div
-            onClick={() => setPreviewFile({ url: fullUrl, name: item.attachmentName ?? 'Photo', type: 'image' })}
+            onClick={() => setPreviewFile({ url: fullUrl, name: fileName, type: 'image' })}
             className="block max-w-xs overflow-hidden rounded-xl border border-[#333] hover:border-[#f5a623] cursor-pointer transition-colors group relative"
           >
             <img
               src={fullUrl}
-              alt={item.attachmentName ?? 'Attached Photo'}
+              alt={fileName}
+              onError={(e) => {
+                const target = e.currentTarget;
+                target.style.display = 'none';
+              }}
               className="max-h-52 w-full object-cover rounded-xl bg-[#111]"
             />
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-xs font-bold">
-              <Eye size={16} /> Click to Preview
+            <div className="p-3 bg-[#181818] border border-[#262626] rounded-xl flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 truncate">
+                <ImageIcon size={16} className="text-amber-400 flex-shrink-0" />
+                <span className="truncate text-xs font-semibold text-white">{fileName}</span>
+              </div>
+              <span className="text-[10px] font-bold text-amber-400 flex items-center gap-1 flex-shrink-0">
+                <Eye size={12} /> View Full
+              </span>
             </div>
-          </div>
-          <div className="flex items-center justify-between text-[10px] text-[#888]">
-            <span className="truncate max-w-[180px]">{item.attachmentName ?? 'Photo'}</span>
-            <button
-              type="button"
-              onClick={() => setPreviewFile({ url: fullUrl, name: item.attachmentName ?? 'Photo', type: 'image' })}
-              className="text-amber-400 hover:underline flex items-center gap-1 font-semibold bg-transparent border-none p-0 cursor-pointer text-[10px]"
-            >
-              <Eye size={10} /> Preview
-            </button>
           </div>
         </div>
       );
@@ -381,13 +612,15 @@ export const JobOrderDetail: React.FC = () => {
         <div className="mt-2 space-y-1.5">
           <button
             type="button"
-            onClick={() => setPreviewFile({ url: fullUrl, name: item.attachmentName ?? 'Document.pdf', type: 'pdf' })}
-            className="inline-flex items-center gap-2.5 px-3 py-2 bg-[#181818] border border-rose-500/30 hover:border-rose-400 text-gray-200 text-xs rounded-xl transition-colors text-left cursor-pointer w-full max-w-xs"
+            onClick={() => setPreviewFile({ url: fullUrl, name: fileName, type: 'pdf' })}
+            className="inline-flex items-center gap-2.5 px-3.5 py-2.5 bg-[#181818] border border-rose-500/30 hover:border-rose-400 text-gray-200 text-xs rounded-xl transition-colors text-left cursor-pointer w-full max-w-xs group"
           >
-            <FileText size={20} className="text-rose-400 flex-shrink-0" />
+            <FileText size={20} className="text-rose-400 flex-shrink-0 group-hover:scale-110 transition-transform" />
             <div className="flex flex-col text-left truncate flex-1">
-              <span className="truncate max-w-[180px] font-semibold text-white">{item.attachmentName ?? 'Document.pdf'}</span>
-              <span className="text-[9px] text-amber-400 font-bold">PDF Document · Tap to Preview 👁</span>
+              <span className="truncate max-w-[180px] font-bold text-white">{fileName}</span>
+              <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1 mt-0.5">
+                <Eye size={10} /> Tap to open ↗
+              </span>
             </div>
           </button>
         </div>
@@ -398,11 +631,11 @@ export const JobOrderDetail: React.FC = () => {
       <div className="mt-2">
         <button
           type="button"
-          onClick={() => setPreviewFile({ url: fullUrl, name: item.attachmentName ?? 'Attachment', type: 'file' })}
-          className="inline-flex items-center gap-2 px-3 py-2 bg-[#181818] border border-[#333] hover:border-[#f5a623] text-gray-200 text-xs rounded-xl transition-colors text-left cursor-pointer"
+          onClick={() => setPreviewFile({ url: fullUrl, name: fileName, type: 'file' })}
+          className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-[#181818] border border-[#333] hover:border-[#f5a623] text-gray-200 text-xs rounded-xl transition-colors text-left cursor-pointer"
         >
           <Paperclip size={16} className="text-amber-400" />
-          <span className="truncate max-w-[180px] font-semibold">{item.attachmentName ?? 'Attachment'}</span>
+          <span className="truncate max-w-[180px] font-semibold">{fileName}</span>
           <Eye size={12} className="text-[#888]" />
         </button>
       </div>
@@ -793,78 +1026,7 @@ export const JobOrderDetail: React.FC = () => {
         </div>
       </div>
       {/* ── File Preview Modal Lightbox ── */}
-      {previewFile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-[#141414] border border-[#2a2a2a] rounded-2xl max-w-4xl w-full flex flex-col overflow-hidden shadow-2xl max-h-[90vh]">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#222] bg-[#181818]">
-              <div className="flex items-center gap-2.5 truncate">
-                {previewFile.type === 'image' ? (
-                  <ImageIcon size={18} className="text-amber-400 flex-shrink-0" />
-                ) : (
-                  <FileText size={18} className="text-rose-400 flex-shrink-0" />
-                )}
-                <span className="font-bold text-white text-sm truncate">{previewFile.name}</span>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <a
-                  href={previewFile.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  download={previewFile.name}
-                  className="px-3 py-1.5 bg-[#222] hover:bg-[#333] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors no-underline"
-                >
-                  <Download size={14} /> Download
-                </a>
-                <a
-                  href={previewFile.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 bg-[#222] hover:bg-[#333] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors no-underline"
-                >
-                  <ExternalLink size={14} /> Open Direct
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setPreviewFile(null)}
-                  className="p-1.5 text-[#888] hover:text-white bg-[#222] hover:bg-rose-500/20 hover:text-rose-400 rounded-lg border-none cursor-pointer transition-colors ml-1"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* Content Preview */}
-            <div className="p-4 flex-1 overflow-auto flex items-center justify-center bg-[#0a0a0a] min-h-[300px]">
-              {previewFile.type === 'image' ? (
-                <img
-                  src={previewFile.url}
-                  alt={previewFile.name}
-                  className="max-h-[75vh] max-w-full object-contain rounded-lg shadow-lg"
-                />
-              ) : previewFile.type === 'pdf' ? (
-                <iframe
-                  src={previewFile.url}
-                  title={previewFile.name}
-                  className="w-full h-[75vh] rounded-lg border-none bg-white"
-                />
-              ) : (
-                <div className="text-center py-12 space-y-3 text-gray-300">
-                  <Paperclip size={36} className="mx-auto text-amber-400" />
-                  <p className="text-sm font-semibold">{previewFile.name}</p>
-                  <a
-                    href={previewFile.url}
-                    download={previewFile.name}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 text-black font-bold text-xs rounded-xl no-underline"
-                  >
-                    <Download size={16} /> Download File
-                  </a>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <FilePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
     </div>
   );
 };
