@@ -131,6 +131,15 @@ function parseTimestamp(ts?: string | null): number {
   return isNaN(t) ? 0 : t;
 }
 
+function getFullFileUrl(rawUrl?: string | null): string {
+  if (!rawUrl) return '';
+  if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('blob:') || rawUrl.startsWith('data:')) {
+    return rawUrl;
+  }
+  const base = 'https://jobtracker-adjt.onrender.com';
+  return `${base}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
+}
+
 function getAuditFeed(order: JobOrder): AuditFeedItem[] {
   const items: AuditFeedItem[] = [];
 
@@ -205,6 +214,13 @@ export const JobOrderDetail: React.FC = () => {
   
   const notesEndRef               = useRef<HTMLDivElement>(null);
   const fileInputRef              = useRef<HTMLInputElement>(null);
+
+  const filePreviewUrl = React.useMemo(() => {
+    if (selectedFile && selectedFile.type.startsWith('image/')) {
+      return URL.createObjectURL(selectedFile);
+    }
+    return null;
+  }, [selectedFile]);
 
   // ── Fetch order details ──────────────────────────────────────────────────
   const fetchOrder = useCallback(async (showSpinner = true) => {
@@ -321,37 +337,54 @@ export const JobOrderDetail: React.FC = () => {
   const renderAttachment = (item: AuditFeedItem) => {
     if (!item.attachmentUrl) return null;
 
+    const fullUrl = getFullFileUrl(item.attachmentUrl);
     const isImage = item.attachmentType === 'image' || /\.(jpg|jpeg|png|gif|webp)$/i.test(item.attachmentUrl);
     const isPdf = item.attachmentType === 'pdf' || /\.pdf$/i.test(item.attachmentUrl);
 
     if (isImage) {
       return (
-        <div className="mt-2">
+        <div className="mt-2 space-y-1">
           <a
-            href={item.attachmentUrl}
+            href={fullUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="block max-w-xs overflow-hidden rounded-xl border border-[#333] hover:opacity-90 transition-opacity"
+            className="block max-w-xs overflow-hidden rounded-xl border border-[#333] hover:border-[#f5a623] transition-colors"
           >
-            <img src={item.attachmentUrl} alt={item.attachmentName ?? 'Attachment Photo'} className="max-h-48 object-cover rounded-xl w-full" />
+            <img
+              src={fullUrl}
+              alt={item.attachmentName ?? 'Attached Photo'}
+              className="max-h-52 w-full object-cover rounded-xl bg-[#111]"
+            />
           </a>
-          {item.attachmentName && <span className="text-[10px] text-[#888] mt-1 block">{item.attachmentName}</span>}
+          <div className="flex items-center justify-between text-[10px] text-[#888]">
+            <span className="truncate max-w-[180px]">{item.attachmentName ?? 'Photo'}</span>
+            <a
+              href={fullUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber-400 hover:underline flex items-center gap-1 font-semibold no-underline"
+            >
+              <ExternalLink size={10} /> View Full
+            </a>
+          </div>
         </div>
       );
     }
 
     if (isPdf) {
       return (
-        <div className="mt-2">
+        <div className="mt-2 space-y-1.5">
           <a
-            href={item.attachmentUrl}
+            href={fullUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-[#333] hover:border-[#f5a623] text-gray-200 text-xs rounded-xl transition-colors no-underline"
+            className="inline-flex items-center gap-2.5 px-3 py-2 bg-[#181818] border border-rose-500/30 hover:border-rose-400 text-gray-200 text-xs rounded-xl transition-colors no-underline"
           >
-            <FileText size={16} className="text-rose-400" />
-            <span className="truncate max-w-[180px] font-semibold">{item.attachmentName ?? 'Document.pdf'}</span>
-            <ExternalLink size={12} className="text-[#888]" />
+            <FileText size={18} className="text-rose-400 flex-shrink-0" />
+            <div className="flex flex-col text-left truncate">
+              <span className="truncate max-w-[180px] font-semibold text-white">{item.attachmentName ?? 'Document.pdf'}</span>
+              <span className="text-[9px] text-[#888]">PDF Document · Tap to open ↗</span>
+            </div>
           </a>
         </div>
       );
@@ -360,10 +393,10 @@ export const JobOrderDetail: React.FC = () => {
     return (
       <div className="mt-2">
         <a
-          href={item.attachmentUrl}
+          href={fullUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-[#333] hover:border-[#f5a623] text-gray-200 text-xs rounded-xl transition-colors no-underline"
+          className="inline-flex items-center gap-2 px-3 py-2 bg-[#181818] border border-[#333] hover:border-[#f5a623] text-gray-200 text-xs rounded-xl transition-colors no-underline"
         >
           <Paperclip size={16} className="text-amber-400" />
           <span className="truncate max-w-[180px] font-semibold">{item.attachmentName ?? 'Attachment'}</span>
@@ -689,23 +722,30 @@ export const JobOrderDetail: React.FC = () => {
 
           <form onSubmit={handleAddNote} className="space-y-2 pt-2 border-t border-[#222]">
             {selectedFile && (
-              <div className="flex items-center justify-between bg-[#1a1a1a] border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs text-amber-300">
-                <div className="flex items-center gap-2 truncate">
-                  {selectedFile.type.startsWith('image/') ? (
-                    <ImageIcon size={14} className="text-amber-400 flex-shrink-0" />
-                  ) : (
-                    <FileText size={14} className="text-rose-400 flex-shrink-0" />
-                  )}
-                  <span className="truncate font-semibold">{selectedFile.name}</span>
-                  <span className="text-[10px] text-[#888]">({(selectedFile.size / 1024).toFixed(1)} KB)</span>
+              <div className="flex flex-col gap-1.5 bg-[#1a1a1a] border border-amber-500/30 p-2.5 rounded-xl text-xs text-amber-300">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 truncate">
+                    {selectedFile.type.startsWith('image/') ? (
+                      <ImageIcon size={14} className="text-amber-400 flex-shrink-0" />
+                    ) : (
+                      <FileText size={14} className="text-rose-400 flex-shrink-0" />
+                    )}
+                    <span className="truncate font-semibold">{selectedFile.name}</span>
+                    <span className="text-[10px] text-[#888]">({(selectedFile.size / 1024).toFixed(1)} KB)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFile(null)}
+                    className="text-[#888] hover:text-white bg-transparent border-none cursor-pointer p-0.5"
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedFile(null)}
-                  className="text-[#888] hover:text-white bg-transparent border-none cursor-pointer p-0.5"
-                >
-                  <X size={14} />
-                </button>
+                {filePreviewUrl && (
+                  <div className="max-h-32 max-w-xs overflow-hidden rounded-lg border border-[#333]">
+                    <img src={filePreviewUrl} alt="Selected Preview" className="h-28 w-auto object-cover rounded-lg" />
+                  </div>
+                )}
               </div>
             )}
 
