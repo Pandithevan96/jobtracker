@@ -29,10 +29,22 @@ interface NoteUser {
   name: string;
 }
 
+interface StatusLog {
+  id: number;
+  from_status: number | null;
+  to_status: number;
+  notes: string | null;
+  created_at: string;
+  changed_by?: NoteUser | null;
+  changedBy?: NoteUser | null;
+}
+
 interface OrderNote {
   id: number;
   note: string;
   created_at: string;
+  user_id?: number;
+  author_role?: number;
   user: NoteUser | null;
 }
 
@@ -63,10 +75,26 @@ interface JobOrder {
   status: number;
   priority: number;
   notes: string | null;
+  created_at?: string;
   vendor: Vendor | null;
   workspace?: Workspace | null;
   creator?: Creator | null;
-  orderNotes: OrderNote[];
+  orderNotes?: OrderNote[];
+  order_notes?: OrderNote[];
+  statusLogs?: StatusLog[];
+  status_logs?: StatusLog[];
+}
+
+interface AuditFeedItem {
+  id: string;
+  type: 'initial_note' | 'status_log' | 'order_note';
+  text: string;
+  authorName: string;
+  authorRole?: number;
+  userId?: number;
+  createdAt: string;
+  statusLabel?: string;
+  statusColor?: string;
 }
 
 // ─── Status helpers (matching backend JobOrder constants) ───────────────────
@@ -83,14 +111,71 @@ const STATUS_MAP: Record<number, { label: string; color: string }> = {
   7: { label: 'Cancelled',         color: 'bg-rose-500/15 text-rose-400 border-rose-500/30' },
 };
 
-function statusInfo(s: number) {
-  return STATUS_MAP[s] ?? { label: `Status ${s}`, color: 'bg-[#333]/40 text-[#aaa] border-[#444]' };
+function parseTimestamp(ts?: string | null): number {
+  if (!ts) return 0;
+  const t = new Date(ts).getTime();
+  return isNaN(t) ? 0 : t;
+}
+
+function getAuditFeed(order: JobOrder): AuditFeedItem[] {
+  const items: AuditFeedItem[] = [];
+
+  // 1. Initial Job Order Notes (typed when order was created)
+  if (order.notes && order.notes.trim()) {
+    items.push({
+      id: `initial-note-${order.id}`,
+      type: 'initial_note',
+      text: order.notes.trim(),
+      authorName: order.creator?.name ?? 'Principal',
+      authorRole: 1, // Principal
+      userId: order.creator?.id,
+      createdAt: order.created_at || new Date().toISOString(),
+    });
+  }
+
+  // 2. Status Log Updates & Notes
+  const logs: StatusLog[] = order.statusLogs || order.status_logs || [];
+  logs.forEach((log) => {
+    const sInfo = statusInfo(log.to_status);
+    const userObj = log.changedBy || log.changed_by;
+    items.push({
+      id: `status-log-${log.id}`,
+      type: 'status_log',
+      text: log.notes ? log.notes : `Status changed to ${sInfo.label}`,
+      authorName: userObj?.name ?? 'System',
+      userId: userObj?.id,
+      createdAt: log.created_at || new Date().toISOString(),
+      statusLabel: sInfo.label,
+      statusColor: sInfo.color,
+    });
+  });
+
+  // 3. User Chat Notes / Messages
+  const notes: OrderNote[] = order.orderNotes || order.order_notes || [];
+  const seenIds = new Set<number>();
+  notes.forEach((n) => {
+    if (n && (!n.id || !seenIds.has(n.id))) {
+      if (n.id) seenIds.add(n.id);
+      items.push({
+        id: `order-note-${n.id || Math.random()}`,
+        type: 'order_note',
+        text: n.note,
+        authorName: n.user?.name ?? 'User',
+        authorRole: n.author_role,
+        userId: n.user_id || n.user?.id,
+        createdAt: n.created_at || new Date().toISOString(),
+      });
+    }
+  });
+
+  // Sort chronologically (oldest first, so newest appears at bottom)
+  return items.sort((a, b) => parseTimestamp(a.createdAt) - parseTimestamp(b.createdAt));
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export const JobOrderDetail: React.FC = () => {
-  const { appMode } = useAuth();
+  const { user, appMode } = useAuth();
   const { id } = useParams<{ id: string }>();
 
   const [order, setOrder]       = useState<JobOrder | null>(null);
@@ -99,24 +184,37 @@ export const JobOrderDetail: React.FC = () => {
   const [newNote, setNewNote]   = useState('');
   const [sending, setSending]   = useState(false);
   const [updating, setUpdating] = useState(false);
+  const notesEndRef             = React.useRef<HTMLDivElement>(null);
 
   // ── Fetch order details ──────────────────────────────────────────────────
-  const fetchOrder = useCallback(async () => {
+  const fetchOrder = useCallback(async (showSpinner = true) => {
     if (!id) return;
-    setLoading(true);
-    setError(null);
+    if (showSpinner) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const res = await apiClient.post('/job-orders/details', { id: Number(id) });
       const data = res.data?.data ?? res.data;
-      setOrder(data);
+      if (data && (data.id || data.order_number)) {
+        setOrder(data);
+      }
     } catch (e: any) {
-      setError(e?.response?.data?.message ?? 'Failed to load job order.');
+      if (showSpinner) setError(e?.response?.data?.message ?? 'Failed to load job order.');
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   }, [id]);
 
-  useEffect(() => { fetchOrder(); }, [fetchOrder]);
+  useEffect(() => { fetchOrder(true); }, [fetchOrder]);
+
+  const auditFeed = order ? getAuditFeed(order) : [];
+
+  useEffect(() => {
+    if (auditFeed.length > 0) {
+      notesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [auditFeed.length]);
 
   // ── Update status ────────────────────────────────────────────────────────
   const handleUpdateStatus = async (newStatus: number) => {
@@ -124,7 +222,7 @@ export const JobOrderDetail: React.FC = () => {
     setUpdating(true);
     try {
       await apiClient.post('/job-orders/update-status', { id: order.id, status: newStatus });
-      setOrder((prev) => prev ? { ...prev, status: newStatus } : prev);
+      await fetchOrder(false);
     } catch (e: any) {
       alert(e?.response?.data?.message ?? 'Failed to update status.');
     } finally {
@@ -135,17 +233,61 @@ export const JobOrderDetail: React.FC = () => {
   // ── Add note ─────────────────────────────────────────────────────────────
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newNote.trim() || !order) return;
+    const noteText = newNote.trim();
+    if (!noteText || !order) return;
     setSending(true);
+    // Optimistically append so UI is instant
+    const tempId = Date.now();
+    const noteObj: OrderNote = {
+      id: tempId,
+      note: noteText,
+      created_at: new Date().toISOString(),
+      user_id: user?.id,
+      author_role: appMode === 'vendor' ? 2 : 1,
+      user: user ? { id: user.id, name: user.name } : null,
+    };
+    setOrder((prev) => {
+      if (!prev) return prev;
+      const existing = prev.order_notes || prev.orderNotes || [];
+      const updated = [...existing, noteObj];
+      return { ...prev, order_notes: updated, orderNotes: updated };
+    });
+    setNewNote('');
     try {
-      await apiClient.post('/job-orders/add-note', { id: order.id, note: newNote.trim() });
-      setNewNote('');
-      await fetchOrder(); // refresh to get the new note from server
+      await apiClient.post('/job-orders/add-note', { id: order.id, note: noteText });
+      // Replace temp optimistic note with confirmed server data
+      await fetchOrder(false);
     } catch (e: any) {
+      // Roll back optimistic update on error
+      setOrder((prev) => {
+        if (!prev) return prev;
+        const existing = prev.order_notes || prev.orderNotes || [];
+        const rolledBack = existing.filter((n: any) => n.id !== tempId);
+        return { ...prev, order_notes: rolledBack, orderNotes: rolledBack };
+      });
+      setNewNote(noteText);
       alert(e?.response?.data?.message ?? 'Failed to add note.');
     } finally {
       setSending(false);
     }
+  };
+
+  const renderRoleBadge = (role?: number) => {
+    if (role === 1) {
+      return (
+        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+          Principal
+        </span>
+      );
+    }
+    if (role === 2) {
+      return (
+        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+          Vendor
+        </span>
+      );
+    }
+    return null;
   };
 
   // ── Loading ───────────────────────────────────────────────────────────────
@@ -357,41 +499,114 @@ export const JobOrderDetail: React.FC = () => {
             )}
             {order.notes && (
               <div className="py-2.5 flex flex-col gap-1">
-                <span className="text-[#888]">Notes</span>
+                <span className="text-[#888]">Initial Order Notes</span>
                 <span className="text-gray-300 leading-relaxed">{order.notes}</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Notes feed */}
+        {/* Notes feed / Chat & Audit Log */}
         <div className="bg-[#141414] border border-[#262626] rounded-2xl p-6 flex flex-col justify-between space-y-4">
           <div>
-            <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-              <MessageSquare size={18} className="text-blue-400" />
-              Audit Notes &amp; Log
-            </h3>
-            <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
-              {order.orderNotes && order.orderNotes.length > 0 ? (
-                order.orderNotes.map((n) => (
-                  <div key={n.id} className="bg-[#1a1a1a] border border-[#2a2a2a] p-3 rounded-xl text-xs space-y-1">
-                    <div className="flex justify-between items-center text-[10px] text-[#777]">
-                      <span className="font-bold text-amber-400">{n.user?.name ?? 'System'}</span>
-                      <span>{new Date(n.created_at).toLocaleString()}</span>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <MessageSquare size={18} className="text-blue-400" />
+                Audit Notes &amp; Activity Log
+              </h3>
+              <span className="text-[10px] text-[#777] font-semibold">Principal ↔ Vendor</span>
+            </div>
+
+            <div className="space-y-3 max-h-72 overflow-y-auto pr-1 flex flex-col">
+              {auditFeed.length > 0 ? (
+                auditFeed.map((item) => {
+                  const isMe = Boolean(user && item.userId && item.userId === user.id);
+
+                  if (item.type === 'initial_note') {
+                    return (
+                      <div
+                        key={item.id}
+                        className="p-3 rounded-2xl text-xs space-y-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-200"
+                      >
+                        <div className="flex items-center justify-between text-[10px] text-[#aaa]">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-amber-400">{item.authorName}</span>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                              Order Creation Note
+                            </span>
+                          </div>
+                          <span className="text-[9px] text-[#777]">
+                            {new Date(item.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                          </span>
+                        </div>
+                        <p className="whitespace-pre-wrap leading-relaxed text-gray-200">{item.text}</p>
+                      </div>
+                    );
+                  }
+
+                  if (item.type === 'status_log') {
+                    return (
+                      <div
+                        key={item.id}
+                        className="p-3 rounded-2xl text-xs space-y-1.5 bg-[#181818] border border-[#2a2a2a] text-gray-300"
+                      >
+                        <div className="flex items-center justify-between text-[10px] text-[#888]">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-white">{item.authorName}</span>
+                            {item.statusLabel && (
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${item.statusColor}`}>
+                                {item.statusLabel}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[9px] text-[#666]">
+                            {new Date(item.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                          </span>
+                        </div>
+                        {item.text && <p className="whitespace-pre-wrap leading-relaxed text-gray-300">{item.text}</p>}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`max-w-[85%] p-3 rounded-2xl text-xs space-y-1.5 ${
+                        isMe
+                          ? 'ml-auto bg-amber-500/15 border border-amber-500/30 text-gray-100 rounded-br-xs'
+                          : 'mr-auto bg-[#1a1a1a] border border-[#2a2a2a] text-gray-200 rounded-bl-xs'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3 text-[10px] text-[#888]">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`font-bold ${isMe ? 'text-amber-400' : 'text-blue-400'}`}>
+                            {isMe ? 'You' : item.authorName}
+                          </span>
+                          {renderRoleBadge(item.authorRole)}
+                        </div>
+                        <span className="text-[9px] text-[#666]">
+                          {new Date(item.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                        </span>
+                      </div>
+                      <p className="whitespace-pre-wrap leading-relaxed">{item.text}</p>
                     </div>
-                    <p className="text-gray-200">{n.note}</p>
-                  </div>
-                ))
+                  );
+                })
               ) : (
-                <p className="text-xs text-[#555] text-center py-4">No notes yet. Add the first update below.</p>
+                <div className="text-center py-8 space-y-1.5">
+                  <MessageSquare size={24} className="mx-auto text-[#444]" />
+                  <p className="text-xs text-[#888]">No notes yet. Add the first update below.</p>
+                  <p className="text-[10px] text-[#555]">Messages are shared between Principal (Sender) and Vendor (Receiver).</p>
+                </div>
               )}
+              <div ref={notesEndRef} />
             </div>
           </div>
 
           <form onSubmit={handleAddNote} className="flex gap-2 pt-2 border-t border-[#222]">
             <input
               type="text"
-              placeholder="Add progress note or update..."
+              placeholder="Add progress note or message..."
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
               disabled={sending}
