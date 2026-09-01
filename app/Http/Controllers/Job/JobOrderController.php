@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Helpers\HelperFunction;
 use App\Services\NotificationService;
 use App\Services\CloudinaryService;
+use App\Events\OrderNoteCreated;
 use App\Models\Job\JobOrder;
 use App\Models\Job\JobOrderNote;
 use App\Models\Job\JobOrderStatusLog;
@@ -532,7 +533,29 @@ class JobOrderController extends Controller
                 'attachment_type' => $attachmentType,
             ]);
 
-            return HelperFunction::response($note->load('user'), null, 'Note added successfully', 'success', '000', Response::HTTP_CREATED);
+            $note->load('user');
+
+            // Broadcast the new note instantly via Reverb WebSocket
+            // so the other party (vendor or principal) sees it without reloading.
+            broadcast(new OrderNoteCreated(
+                jobOrderId: $jobOrder->id,
+                note: [
+                    'id'              => $note->id,
+                    'note'            => $note->note,
+                    'author_role'     => $note->author_role,
+                    'user_id'         => $note->user_id,
+                    'created_at'      => $note->created_at->toISOString(),
+                    'attachment_url'  => $note->attachment_url,
+                    'attachment_name' => $note->attachment_name,
+                    'attachment_type' => $note->attachment_type,
+                    'user'            => $note->user ? [
+                        'id'   => $note->user->id,
+                        'name' => $note->user->name,
+                    ] : null,
+                ]
+            ));
+
+            return HelperFunction::response($note, null, 'Note added successfully', 'success', '000', Response::HTTP_CREATED);
         } catch (Exception $e) {
             return HelperFunction::response(null, null, 'Failed to add note: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }

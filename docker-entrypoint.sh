@@ -10,5 +10,8 @@ php artisan route:clear || true
 # Run database migrations
 php artisan migrate --force
 
-# Execute CMD process
+# Create supervisor log directory
+mkdir -p /var/log/supervisor
+
+# Execute CMD (supervisord) which manages php-serve + reverb + nginx
 exec "$@"

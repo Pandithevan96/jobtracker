@@ -17,8 +17,11 @@ import {
   Eye,
   Download,
   Maximize2,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import apiClient from '@/services/apiClient';
+import { getEcho, destroyEcho } from '@/services/echoClient';
 import { useAuth } from '@/context/AuthContext';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -276,8 +279,10 @@ export const JobOrderDetail: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [sending, setSending]     = useState(false);
   const [updating, setUpdating]   = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
   
   const [previewFile, setPreviewFile] = useState<{ url: string; name: string; type: 'image' | 'pdf' | 'file' } | null>(null);
+  const echoChannelRef = useRef<any>(null);
 
   const notesEndRef               = useRef<HTMLDivElement>(null);
   const fileInputRef              = useRef<HTMLInputElement>(null);
@@ -307,6 +312,52 @@ export const JobOrderDetail: React.FC = () => {
 
   useEffect(() => { fetchOrder(true); }, [fetchOrder]);
 
+  // ── Real-time WebSocket subscription via Laravel Reverb ────────────────────
+  useEffect(() => {
+    if (!id || !user) return;
+
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
+    let echo: any;
+    try {
+      echo = getEcho(token);
+    } catch {
+      return;
+    }
+
+    const channelName = `job-order.${id}`;
+
+    // Subscribe to the private channel for this job order
+    const channel = echo
+      .private(channelName)
+      .listen('.note.created', (event: { note: OrderNote }) => {
+        const incoming = event.note;
+        if (!incoming) return;
+
+        // Append the note to local state if we don't already have it
+        setOrder((prev) => {
+          if (!prev) return prev;
+          const existing: OrderNote[] = prev.order_notes || prev.orderNotes || [];
+          const alreadyHas = existing.some((n) => n.id === incoming.id);
+          if (alreadyHas) return prev;
+          const updated = [...existing, incoming];
+          return { ...prev, orderNotes: updated, order_notes: updated };
+        });
+      })
+      .subscribed(() => setWsConnected(true))
+      .error(() => setWsConnected(false));
+
+    echoChannelRef.current = channel;
+
+    return () => {
+      echo.leave(channelName);
+      echoChannelRef.current = null;
+      setWsConnected(false);
+    };
+  }, [id, user]);
+
+  // Scroll to bottom whenever audit feed grows
   const auditFeed = order ? getAuditFeed(order) : [];
 
   useEffect(() => {
@@ -866,7 +917,23 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, onClose }) =>
                 <MessageSquare size={18} className="text-blue-400" />
                 Audit Notes &amp; Activity Log
               </h3>
-              <span className="text-[10px] text-[#777] font-semibold">Principal ↔ Vendor</span>
+              <div className="flex items-center gap-2">
+                {/* Real-time WebSocket status indicator */}
+                <span
+                  title={wsConnected ? 'Real-time — messages appear instantly' : 'Connecting to live chat…'}
+                  className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border transition-colors ${
+                    wsConnected
+                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                      : 'bg-[#222] text-[#666] border-[#2a2a2a]'
+                  }`}
+                >
+                  {wsConnected
+                    ? <><Wifi size={10} /> Live</>
+                    : <><WifiOff size={10} /> Connecting…</>
+                  }
+                </span>
+                <span className="text-[10px] text-[#777] font-semibold">Principal ↔ Vendor</span>
+              </div>
             </div>
 
             <div className="space-y-3 max-h-72 overflow-y-auto pr-1 flex flex-col">
