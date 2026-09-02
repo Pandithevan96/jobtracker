@@ -312,6 +312,15 @@ export const JobOrderDetail: React.FC = () => {
 
   useEffect(() => { fetchOrder(true); }, [fetchOrder]);
 
+  // ── Auto-sync polling every 3 seconds so messages arrive live ───────────
+  useEffect(() => {
+    if (!id) return;
+    const pollInterval = setInterval(() => {
+      fetchOrder(false);
+    }, 3000);
+    return () => clearInterval(pollInterval);
+  }, [id, fetchOrder]);
+
   // ── Real-time WebSocket subscription via Laravel Reverb ────────────────────
   useEffect(() => {
     if (!id || !user) return;
@@ -918,19 +927,12 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, onClose }) =>
                 Audit Notes &amp; Activity Log
               </h3>
               <div className="flex items-center gap-2">
-                {/* Real-time WebSocket status indicator */}
+                {/* Real-time status indicator */}
                 <span
-                  title={wsConnected ? 'Real-time — messages appear instantly' : 'Connecting to live chat…'}
-                  className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border transition-colors ${
-                    wsConnected
-                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                      : 'bg-[#222] text-[#666] border-[#2a2a2a]'
-                  }`}
+                  title={wsConnected ? 'Real-time WebSocket active' : 'Live Auto-Sync Active'}
+                  className="flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
                 >
-                  {wsConnected
-                    ? <><Wifi size={10} /> Live</>
-                    : <><WifiOff size={10} /> Connecting…</>
-                  }
+                  <Wifi size={10} /> {wsConnected ? 'Live WS' : 'Live Sync'}
                 </span>
                 <span className="text-[10px] text-[#777] font-semibold">Principal ↔ Vendor</span>
               </div>
