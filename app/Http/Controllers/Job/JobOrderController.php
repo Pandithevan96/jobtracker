@@ -415,15 +415,17 @@ class JobOrderController extends Controller
                     $cloudinary = new CloudinaryService();
                     $uploaded   = $cloudinary->upload($file, config('cloudinary.folder', 'jobtracker') . '/job_documents');
                     $url        = $uploaded['url'];
-                    $path       = $url; // store full CDN URL as path
+                    $path       = $url;
                 } catch (\Exception $cdnEx) {
-                    \Illuminate\Support\Facades\Log::warning('Cloudinary upload failed, using local: ' . $cdnEx->getMessage());
-                    $path = $file->store('job_documents', 'public');
-                    $url  = Storage::disk('public')->url($path);
+                    \Illuminate\Support\Facades\Log::warning('Cloudinary upload failed, using Data URL: ' . $cdnEx->getMessage());
+                    $mime = $file->getMimeType() ?: 'application/octet-stream';
+                    $url  = "data:{$mime};base64," . base64_encode(file_get_contents($file->getRealPath()));
+                    $path = $url;
                 }
             } else {
-                $path = $file->store('job_documents', 'public');
-                $url  = Storage::disk('public')->url($path);
+                $mime = $file->getMimeType() ?: 'application/octet-stream';
+                $url  = "data:{$mime};base64," . base64_encode(file_get_contents($file->getRealPath()));
+                $path = $url;
             }
 
             $existing = $jobOrder->drawing_urls ?? [];
@@ -503,21 +505,22 @@ class JobOrderController extends Controller
                 }
 
                 // Use Cloudinary for persistent storage when credentials are configured.
-                // Falls back to local storage (ephemeral on Render) when not configured.
+                // Falls back to Data URL (persistent in DB) when Cloudinary is not configured.
                 if (config('cloudinary.cloud_name') && config('cloudinary.api_key') && config('cloudinary.api_secret')) {
                     try {
                         $cloudinary     = new CloudinaryService();
                         $uploaded       = $cloudinary->upload($file, config('cloudinary.folder', 'jobtracker') . '/note_attachments');
                         $attachmentUrl  = $uploaded['url'];
                     } catch (\Exception $cdnEx) {
-                        // Cloudinary failed — fall back to local disk
-                        \Illuminate\Support\Facades\Log::warning('Cloudinary upload failed, using local storage: ' . $cdnEx->getMessage());
-                        $path          = $file->store('note_attachments', 'public');
-                        $attachmentUrl = Storage::disk('public')->url($path);
+                        \Illuminate\Support\Facades\Log::warning('Cloudinary upload failed, using Data URL fallback: ' . $cdnEx->getMessage());
+                        $mime           = $file->getMimeType() ?: 'application/octet-stream';
+                        $base64Data     = base64_encode(file_get_contents($file->getRealPath()));
+                        $attachmentUrl  = "data:{$mime};base64,{$base64Data}";
                     }
                 } else {
-                    $path          = $file->store('note_attachments', 'public');
-                    $attachmentUrl = Storage::disk('public')->url($path);
+                    $mime           = $file->getMimeType() ?: 'application/octet-stream';
+                    $base64Data     = base64_encode(file_get_contents($file->getRealPath()));
+                    $attachmentUrl  = "data:{$mime};base64,{$base64Data}";
                 }
             }
 
