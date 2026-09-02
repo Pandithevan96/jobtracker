@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y \
     nginx \
     supervisor \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_mysql gd zip bcmath mbstring
+    && docker-php-ext-install pdo pdo_mysql gd zip bcmath mbstring pcntl posix
 
 # Install Node.js (LTS) & npm — needed to build the Vite/React frontend
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
