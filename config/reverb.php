@@ -73,11 +73,11 @@ return [
 
         'apps' => [
             [
-                'key' => env('REVERB_APP_KEY'),
-                'secret' => env('REVERB_APP_SECRET'),
-                'app_id' => env('REVERB_APP_ID'),
+                'key' => env('REVERB_APP_KEY', 'jt-ws-key-a1b2c3d4'),
+                'secret' => env('REVERB_APP_SECRET', 'jt-ws-secret-x9y8z7w6'),
+                'app_id' => env('REVERB_APP_ID', 'jobtracker-app'),
                 'options' => [
-                    'host' => env('REVERB_HOST'),
+                    'host' => env('REVERB_HOST', 'jobtracker-adjt.onrender.com'),
                     'port' => env('REVERB_PORT', 443),
                     'scheme' => env('REVERB_SCHEME', 'https'),
                     'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
