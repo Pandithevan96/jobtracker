@@ -585,7 +585,12 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, onClose }) =>
               onLoad={() => setLoading(false)}
               onError={() => {
                 setLoading(false);
-                setError('Failed to load image preview. The file link may be invalid or moved.');
+                const isDummyOrOld = file.name.toLowerCase().includes('dummy') || file.url.includes('/storage/');
+                if (isDummyOrOld) {
+                  setError(`This file (${file.name}) was created before persistent cloud storage was enabled on Render. Please attach a new photo or PDF using the paperclip button below to see the live working preview!`);
+                } else {
+                  setError('Failed to load image preview. The file link may be invalid or moved.');
+                }
               }}
               className="max-h-[75vh] max-w-full object-contain rounded-lg shadow-2xl transition-opacity duration-300"
               style={{ opacity: loading ? 0 : 1 }}
