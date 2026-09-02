@@ -21,12 +21,20 @@ const REVERB_SCHEME  = import.meta.env.VITE_REVERB_SCHEME  || (typeof window !==
 
 let echoInstance: Echo<'reverb'> | null = null;
 
-export function getEcho(authToken: string): Echo<'reverb'> {
-  if (echoInstance) return echoInstance;
+export function getEcho(authToken?: string): Echo<'reverb'> {
+  const token = authToken || localStorage.getItem('auth_token') || '';
 
   const authUrl = typeof window !== 'undefined' 
     ? `${window.location.origin}/broadcasting/auth`
     : 'https://jobtracker-adjt.onrender.com/broadcasting/auth';
+
+  if (echoInstance) {
+    // Keep Authorization header updated with current token
+    try {
+      (echoInstance as any).options.auth.headers.Authorization = `Bearer ${token}`;
+    } catch {}
+    return echoInstance;
+  }
 
   echoInstance = new Echo({
     broadcaster: 'reverb',
@@ -40,7 +48,7 @@ export function getEcho(authToken: string): Echo<'reverb'> {
     authEndpoint: authUrl,
     auth: {
       headers: {
-        Authorization: `Bearer ${authToken}`,
+        Authorization: `Bearer ${token}`,
         Accept: 'application/json',
         'X-App-Mode': localStorage.getItem('app_mode') || 'principal',
       },
