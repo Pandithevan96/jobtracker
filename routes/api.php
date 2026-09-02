@@ -38,6 +38,9 @@ Route::prefix('v1')->group(function () {
     */
     Route::middleware('auth:sanctum')->group(function () {
 
+        // Broadcasting Channel Authorization Endpoint (Sanctum Auth)
+        \Illuminate\Support\Facades\Broadcast::routes();
+
         Route::post('logout',          'Auth\AuthController@logout');
         Route::post('me',              'Auth\AuthController@me');
         Route::post('change-password', 'Auth\AuthController@changePassword');

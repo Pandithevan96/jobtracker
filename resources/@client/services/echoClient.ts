@@ -25,8 +25,8 @@ export function getEcho(authToken?: string): Echo<'reverb'> {
   const token = authToken || localStorage.getItem('auth_token') || '';
 
   const authUrl = typeof window !== 'undefined' 
-    ? `${window.location.origin}/broadcasting/auth`
-    : 'https://jobtracker-adjt.onrender.com/broadcasting/auth';
+    ? `${window.location.origin}/api/v1/broadcasting/auth`
+    : 'https://jobtracker-adjt.onrender.com/api/v1/broadcasting/auth';
 
   if (echoInstance) {
     // Keep Authorization header updated with current token
