@@ -1,6 +1,10 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Broadcast;
+
+// Register broadcasting authorization endpoint with Sanctum Bearer Token middleware
+Broadcast::routes(['middleware' => ['api', 'auth:sanctum']]);
 
 
 /*
