@@ -517,21 +517,14 @@ class DeliveryChallanController extends Controller
             ])->setPaper('a4', 'portrait');
 
             // Save to public storage (requires storage:link to be run once)
-            $fileName = 'DC_' . str_pad($challan->id, 4, '0', STR_PAD_LEFT) . '_' . date('Ymd_His') . '.pdf';
-            $storagePath = 'challan_pdfs/' . $fileName;
-
-            try {
-                Storage::disk('public')->put($storagePath, $pdf->output());
-            } catch (\Throwable $fsEx) {
-                \Illuminate\Support\Facades\Log::warning('Disk write warning: ' . $fsEx->getMessage());
-            }
-
-            // Build dynamic stream URL (guarantees 100% working PDF stream on Render with 0% 404s)
-            $downloadUrl = url('api/v1/challans/pdf/' . $challan->id);
+            $dcNumber = $challan->challan_number ?: ('DC_' . str_pad($challan->id, 4, '0', STR_PAD_LEFT));
+            $fileName = $dcNumber . '.pdf';
+            $base64Pdf = base64_encode($pdf->output());
 
             return HelperFunction::response([
-                'download_url' => $downloadUrl,
-                'file_name'    => $fileName,
+                'file_name'  => $fileName,
+                'base64_pdf' => 'data:application/pdf;base64,' . $base64Pdf,
+                'stream_url' => url('api/v1/challans/pdf/' . $challan->id),
             ], null, 'PDF generated successfully', 'success', '000', Response::HTTP_OK);
 
         } catch (Exception $e) {
@@ -547,7 +540,7 @@ class DeliveryChallanController extends Controller
     {
         try {
             $challan = DeliveryChallan::with(['items', 'vendor', 'jobOrder'])->find($id);
-            if (!$challan) abort(404);
+            if (!$challan) abort(404, 'Delivery Challan not found');
 
             $workspace = Workspace::find($challan->workspace_id);
 
@@ -556,14 +549,15 @@ class DeliveryChallanController extends Controller
                 'workspace' => $workspace,
             ])->setPaper('a4', 'portrait');
 
-            $fileName = 'DC_' . str_pad($challan->id, 4, '0', STR_PAD_LEFT) . '.pdf';
+            $dcNumber = $challan->challan_number ?: ('DC_' . str_pad($challan->id, 4, '0', STR_PAD_LEFT));
+            $fileName = $dcNumber . '.pdf';
 
             return response($pdf->output(), 200, [
                 'Content-Type'        => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="' . $fileName . '"',
+                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
             ]);
         } catch (\Throwable $e) {
-            return response('Error generating PDF: ' . $e->getMessage(), 500);
+            return response()->json(['status' => 'error', 'message' => 'Error generating PDF: ' . $e->getMessage()], 500);
         }
     }
 

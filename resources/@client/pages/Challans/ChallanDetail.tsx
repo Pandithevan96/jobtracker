@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   Printer,
+  Download,
   Loader2,
   AlertCircle,
   RefreshCw,
@@ -112,10 +113,33 @@ export const ChallanDetail: React.FC = () => {
     }
   };
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     if (!challan) return;
-    const pdfUrl = `${window.location.origin}/api/v1/challans/pdf/${challan.id}`;
-    window.open(pdfUrl, '_blank');
+    setDownloadingPdf(true);
+    try {
+      const res = await apiClient.post('/challans/download-pdf', { id: challan.id });
+      const data = res.data?.data ?? res.data;
+      const base64Data = data?.base64_pdf;
+      const fileName = data?.file_name || `DC_${challan.challan_number || challan.dc_number || challan.id}.pdf`;
+
+      if (base64Data) {
+        const link = document.createElement('a');
+        link.href = base64Data;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else if (data?.stream_url) {
+        window.open(data.stream_url, '_blank');
+      } else {
+        throw new Error('PDF data was not returned by server.');
+      }
+    } catch (e: any) {
+      const errMsg = e?.response?.data?.message || e?.message || 'Failed to download Delivery Challan PDF.';
+      alert(`Download Error: ${errMsg}`);
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
 
   const handlePrint = () => {
@@ -229,9 +253,11 @@ export const ChallanDetail: React.FC = () => {
           <button
             type="button"
             onClick={handleDownloadPdf}
-            className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs px-3.5 py-2 rounded-xl border-none cursor-pointer flex items-center gap-1.5 transition-colors"
+            disabled={downloadingPdf}
+            className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black font-bold text-xs px-3.5 py-2 rounded-xl border-none cursor-pointer flex items-center gap-1.5 transition-colors"
           >
-            <Printer size={15} /> Download PDF
+            {downloadingPdf ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+            Download PDF
           </button>
         </div>
       </div>
