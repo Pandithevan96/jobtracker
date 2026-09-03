@@ -44,6 +44,9 @@ RUN mkdir -p /var/www/html/storage/app/public/note_attachments /var/www/html/sto
 # Copy nginx config
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 
+# Copy PHP upload config
+COPY docker/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+
 # Copy supervisor config
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
