@@ -299,14 +299,18 @@ export const JobOrderDetail: React.FC = () => {
 
   useEffect(() => { fetchOrder(true); }, [fetchOrder]);
 
-  // ── Auto-sync polling every 3 seconds so messages arrive live ───────────
+  // ── Auto-sync polling for live updates (paused while viewing preview modal) ──
   useEffect(() => {
-    if (!id) return;
+    if (!id || previewFile !== null) return;
+
+    // If WebSocket is connected, poll less frequently (every 15s); otherwise poll every 5s
+    const intervalTime = wsConnected ? 15000 : 5000;
     const pollInterval = setInterval(() => {
       fetchOrder(false);
-    }, 3000);
+    }, intervalTime);
+
     return () => clearInterval(pollInterval);
-  }, [id, fetchOrder]);
+  }, [id, previewFile, wsConnected, fetchOrder]);
 
   // ── Real-time WebSocket subscription via Laravel Reverb ────────────────────
   useEffect(() => {
