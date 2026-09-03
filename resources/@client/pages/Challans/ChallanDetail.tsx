@@ -112,23 +112,14 @@ export const ChallanDetail: React.FC = () => {
     }
   };
 
-  const handlePrintOrPdf = async () => {
+  const handleDownloadPdf = () => {
     if (!challan) return;
-    setDownloadingPdf(true);
-    try {
-      const res = await apiClient.post('/challans/download-pdf', { id: challan.id });
-      const downloadUrl = res.data?.data?.download_url || res.data?.download_url;
-      if (downloadUrl) {
-        window.open(downloadUrl, '_blank');
-      } else {
-        window.print();
-      }
-    } catch {
-      // Fallback to browser native print
-      window.print();
-    } finally {
-      setDownloadingPdf(false);
-    }
+    const pdfUrl = `${window.location.origin}/api/v1/challans/pdf/${challan.id}`;
+    window.open(pdfUrl, '_blank');
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   if (loading) {
@@ -181,6 +172,27 @@ export const ChallanDetail: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          #printable-challan-card, #printable-challan-card * {
+            visibility: visible !important;
+          }
+          #printable-challan-card {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 20px !important;
+            border: none !important;
+            box-shadow: none !important;
+          }
+        }
+      `}</style>
+
       {/* Back & Actions Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <Link
@@ -207,18 +219,25 @@ export const ChallanDetail: React.FC = () => {
           )}
 
           <button
-            onClick={handlePrintOrPdf}
-            disabled={downloadingPdf}
-            className="bg-[#222] hover:bg-[#2e2e2e] text-white font-bold text-xs px-4 py-2 rounded-xl border border-[#333] cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+            type="button"
+            onClick={handlePrint}
+            className="bg-[#222] hover:bg-[#2e2e2e] text-white font-bold text-xs px-3.5 py-2 rounded-xl border border-[#333] cursor-pointer flex items-center gap-1.5 transition-colors"
           >
-            {downloadingPdf ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
-            Print / Download PDF
+            <Printer size={15} /> Print
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownloadPdf}
+            className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs px-3.5 py-2 rounded-xl border-none cursor-pointer flex items-center gap-1.5 transition-colors"
+          >
+            <Printer size={15} /> Download PDF
           </button>
         </div>
       </div>
 
       {/* Formal Challan Document Paper Card */}
-      <div className="bg-white text-black rounded-2xl p-8 shadow-2xl border border-gray-200 font-sans print:p-0 print:border-none">
+      <div id="printable-challan-card" className="bg-white text-black rounded-2xl p-8 shadow-2xl border border-gray-200 font-sans print:p-0 print:border-none">
         {/* Header */}
         <div className="flex justify-between items-start border-b border-gray-300 pb-6 mb-6">
           <div>
