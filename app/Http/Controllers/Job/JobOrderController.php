@@ -448,8 +448,8 @@ class JobOrderController extends Controller
 
             $validation = Validator::make($request->all(), [
                 'id'         => 'required|integer|exists:job_orders,id',
-                'note'       => 'nullable|string|max:1000',
-                'attachment' => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,dwg|max:10240',
+                'note'       => 'nullable|string|max:2000',
+                'attachment' => 'nullable|file|max:20480',
             ]);
 
             if ($validation->fails()) {
@@ -484,9 +484,10 @@ class JobOrderController extends Controller
                 $ext            = strtolower($file->getClientOriginalExtension() ?: 'bin');
                 $filename       = 'note_' . date('YmdHis') . '_' . uniqid() . '.' . $ext;
 
-                // Native Laravel server storage (matching caservices)
-                $path           = $file->storeAs('note_attachments', $filename, 'public');
-                $attachmentUrl  = '/storage/' . $path;
+                $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'dwg', 'csv', 'txt'];
+                if (!in_array($ext, $allowed)) {
+                    return HelperFunction::response(null, null, 'Invalid file extension: .' . $ext, 'error', '001', Response::HTTP_BAD_REQUEST);
+                }
 
                 if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
                     $attachmentType = 'image';
@@ -495,6 +496,18 @@ class JobOrderController extends Controller
                 } else {
                     $attachmentType = 'file';
                 }
+
+                // Store file locally on server disk
+                try {
+                    $file->storeAs('note_attachments', $filename, 'public');
+                } catch (\Throwable $fsEx) {
+                    \Illuminate\Support\Facades\Log::warning('Disk write warning: ' . $fsEx->getMessage());
+                }
+
+                // Convert file to Data URL stored permanently in database LONGTEXT column (0% chance of 404 across container rebuilds)
+                $mime          = $file->getMimeType() ?: 'application/octet-stream';
+                $base64Data    = base64_encode(file_get_contents($file->getRealPath()));
+                $attachmentUrl = "data:{$mime};base64,{$base64Data}";
             }
 
             $authorRole = $user->isVendor() ? JobOrderNote::ROLE_VENDOR : JobOrderNote::ROLE_PRINCIPAL;
