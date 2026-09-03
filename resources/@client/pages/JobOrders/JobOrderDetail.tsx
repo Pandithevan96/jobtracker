@@ -167,13 +167,6 @@ function getAuditFeed(order: JobOrder): AuditFeedItem[] {
     let attName: string | undefined;
     let attType: string | undefined;
 
-    if (/\.(jpg|jpeg|png|gif|webp|pdf|dwg|doc|docx)$/i.test(initialText)) {
-      attName = initialText;
-      attUrl = `/storage/job_documents/${initialText}`;
-      if (/\.(jpg|jpeg|png|gif|webp)$/i.test(initialText)) attType = 'image';
-      else if (/\.pdf$/i.test(initialText)) attType = 'pdf';
-    }
-
     items.push({
       id: `initial-note-${order.id}`,
       type: 'initial_note',
@@ -216,12 +209,6 @@ function getAuditFeed(order: JobOrder): AuditFeedItem[] {
       let attType = n.attachment_type || (n as any).attachmentType;
 
       const noteText = (n.note || '').trim();
-      if (!attUrl && noteText && /\.(jpg|jpeg|png|gif|webp|pdf|dwg|doc|docx)$/i.test(noteText)) {
-        attName = attName || noteText;
-        attUrl = `/storage/note_attachments/${noteText}`;
-        if (/\.(jpg|jpeg|png|gif|webp)$/i.test(noteText)) attType = 'image';
-        else if (/\.pdf$/i.test(noteText)) attType = 'pdf';
-      }
 
       items.push({
         id: `order-note-${n.id || Math.random()}`,
