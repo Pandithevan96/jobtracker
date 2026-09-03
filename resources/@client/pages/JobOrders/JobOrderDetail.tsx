@@ -629,29 +629,33 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, onClose }) =>
     const isPdf   = item.attachmentType === 'pdf' || /\.pdf$/i.test(fullUrl || item.attachmentName || '');
     const fileName = item.attachmentName || item.text || 'File Attachment';
 
+    const isDataUrl = fullUrl.startsWith('data:') || fullUrl.startsWith('https://res.cloudinary.com/');
+
     if (isImage) {
       return (
         <div className="mt-2 space-y-1">
           <div
             onClick={() => setPreviewFile({ url: fullUrl, name: fileName, type: 'image' })}
-            className="block max-w-xs overflow-hidden rounded-xl border border-[#333] hover:border-[#f5a623] cursor-pointer transition-colors group relative"
+            className="block max-w-xs overflow-hidden rounded-xl border border-[#333] hover:border-[#f5a623] cursor-pointer transition-colors group relative bg-[#181818]"
           >
-            <img
-              src={fullUrl}
-              alt={fileName}
-              onError={(e) => {
-                const target = e.currentTarget;
-                target.style.display = 'none';
-              }}
-              className="max-h-52 w-full object-cover rounded-xl bg-[#111]"
-            />
-            <div className="p-3 bg-[#181818] border border-[#262626] rounded-xl flex items-center justify-between gap-2">
+            {isDataUrl && (
+              <img
+                src={fullUrl}
+                alt={fileName}
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  target.style.display = 'none';
+                }}
+                className="max-h-52 w-full object-cover rounded-t-xl bg-[#111]"
+              />
+            )}
+            <div className="p-3 border-t border-[#262626] flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 truncate">
                 <ImageIcon size={16} className="text-amber-400 flex-shrink-0" />
                 <span className="truncate text-xs font-semibold text-white">{fileName}</span>
               </div>
               <span className="text-[10px] font-bold text-amber-400 flex items-center gap-1 flex-shrink-0">
-                <Eye size={12} /> View Full
+                <Eye size={12} /> View
               </span>
             </div>
           </div>
