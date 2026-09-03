@@ -467,11 +467,19 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, onClose }) =>
     setLoading(true);
     setError(null);
 
+    // Safety timeout: stop spinner after 400ms for data URLs / fast renders
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 400);
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [file, onClose]);
 
   if (!file) return null;
@@ -584,18 +592,29 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, onClose }) =>
             />
           )}
 
-          {/* PDF */}
+          {/* PDF Viewer */}
           {!error && file.type === 'pdf' && (
-            <iframe
-              src={file.url}
-              title={file.name}
+            <object
+              data={file.url}
+              type="application/pdf"
               onLoad={() => setLoading(false)}
-              onError={() => {
-                setLoading(false);
-                setError('Unable to embed PDF viewer. Tap "Open in New Tab" or "Download" above to view document.');
-              }}
               className="w-full h-[75vh] rounded-lg border-none bg-white shadow-xl"
-            />
+            >
+              <embed src={file.url} type="application/pdf" className="w-full h-[75vh]" />
+              <div className="p-6 text-center text-white space-y-3">
+                <FileText size={36} className="mx-auto text-rose-400" />
+                <p className="text-sm font-bold">PDF Document: {file.name}</p>
+                <a
+                  href={file.url}
+                  download={file.name}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-black font-bold text-xs rounded-xl no-underline"
+                >
+                  <Download size={14} /> Open / Download PDF
+                </a>
+              </div>
+            </object>
           )}
 
           {/* Generic File */}
