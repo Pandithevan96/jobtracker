@@ -411,9 +411,18 @@ class JobOrderController extends Controller
             $ext          = strtolower($file->getClientOriginalExtension() ?: 'bin');
             $filename     = 'doc_' . date('YmdHis') . '_' . uniqid() . '.' . $ext;
 
-            // Native Laravel server storage (matching caservices)
-            $path         = $file->storeAs('job_documents', $filename, 'public');
-            $url          = '/storage/' . $path;
+            // Store file locally on server disk
+            try {
+                $file->storeAs('job_documents', $filename, 'public');
+            } catch (\Throwable $fsEx) {
+                \Illuminate\Support\Facades\Log::warning('Disk write warning: ' . $fsEx->getMessage());
+            }
+
+            // Convert file to Data URL stored permanently in database (0% chance of 404 across container rebuilds)
+            $mime         = $file->getMimeType() ?: 'application/octet-stream';
+            $base64Data   = base64_encode(file_get_contents($file->getRealPath()));
+            $url          = "data:{$mime};base64,{$base64Data}";
+            $path         = $url;
 
             $existing = $jobOrder->drawing_urls ?? [];
             $existing[] = [
