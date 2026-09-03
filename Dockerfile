@@ -37,8 +37,9 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 RUN npm install
 RUN npm run build
 
-# Set permissions for storage & cache
-RUN chmod -R 777 /var/www/html/storage /var/www/html/bootstrap/cache
+# Create storage directories and set full permissions for server-native storage
+RUN mkdir -p /var/www/html/storage/app/public/note_attachments /var/www/html/storage/app/public/job_documents \
+    && chmod -R 777 /var/www/html/storage /var/www/html/bootstrap/cache
 
 # Copy nginx config
 COPY docker/nginx.conf /etc/nginx/nginx.conf

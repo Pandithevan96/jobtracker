@@ -406,27 +406,14 @@ class JobOrderController extends Controller
                 return HelperFunction::response(null, null, 'You do not have access to this job order', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
-            $file = $request->file('file');
+            $file         = $request->file('file');
             $originalName = $file->getClientOriginalName();
+            $ext          = strtolower($file->getClientOriginalExtension() ?: 'bin');
+            $filename     = 'doc_' . date('YmdHis') . '_' . uniqid() . '.' . $ext;
 
-            // Use Cloudinary for persistent storage when credentials are configured.
-            if (config('cloudinary.cloud_name') && config('cloudinary.api_key') && config('cloudinary.api_secret')) {
-                try {
-                    $cloudinary = new CloudinaryService();
-                    $uploaded   = $cloudinary->upload($file, config('cloudinary.folder', 'jobtracker') . '/job_documents');
-                    $url        = $uploaded['url'];
-                    $path       = $url;
-                } catch (\Exception $cdnEx) {
-                    \Illuminate\Support\Facades\Log::warning('Cloudinary upload failed, using Data URL: ' . $cdnEx->getMessage());
-                    $mime = $file->getMimeType() ?: 'application/octet-stream';
-                    $url  = "data:{$mime};base64," . base64_encode(file_get_contents($file->getRealPath()));
-                    $path = $url;
-                }
-            } else {
-                $mime = $file->getMimeType() ?: 'application/octet-stream';
-                $url  = "data:{$mime};base64," . base64_encode(file_get_contents($file->getRealPath()));
-                $path = $url;
-            }
+            // Native Laravel server storage (matching caservices)
+            $path         = $file->storeAs('job_documents', $filename, 'public');
+            $url          = '/storage/' . $path;
 
             $existing = $jobOrder->drawing_urls ?? [];
             $existing[] = [
@@ -494,7 +481,12 @@ class JobOrderController extends Controller
             if ($request->hasFile('attachment')) {
                 $file           = $request->file('attachment');
                 $attachmentName = $file->getClientOriginalName();
-                $ext            = strtolower($file->getClientOriginalExtension());
+                $ext            = strtolower($file->getClientOriginalExtension() ?: 'bin');
+                $filename       = 'note_' . date('YmdHis') . '_' . uniqid() . '.' . $ext;
+
+                // Native Laravel server storage (matching caservices)
+                $path           = $file->storeAs('note_attachments', $filename, 'public');
+                $attachmentUrl  = '/storage/' . $path;
 
                 if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
                     $attachmentType = 'image';
@@ -502,24 +494,6 @@ class JobOrderController extends Controller
                     $attachmentType = 'pdf';
                 } else {
                     $attachmentType = 'file';
-                }
-
-                // 1. Use Cloudinary for persistent storage when credentials are configured.
-                if (config('cloudinary.cloud_name') && config('cloudinary.api_key') && config('cloudinary.api_secret')) {
-                    try {
-                        $cloudinary     = new CloudinaryService();
-                        $uploaded       = $cloudinary->upload($file, config('cloudinary.folder', 'jobtracker') . '/note_attachments');
-                        $attachmentUrl  = $uploaded['url'];
-                    } catch (\Exception $cdnEx) {
-                        \Illuminate\Support\Facades\Log::warning('Cloudinary upload failed: ' . $cdnEx->getMessage());
-                    }
-                }
-
-                // 2. Fallback to Data URL (stored in LONGTEXT in DB, never 404s)
-                if (!$attachmentUrl) {
-                    $mime           = $file->getMimeType() ?: 'application/octet-stream';
-                    $base64Data     = base64_encode(file_get_contents($file->getRealPath()));
-                    $attachmentUrl  = "data:{$mime};base64,{$base64Data}";
                 }
             }
 
