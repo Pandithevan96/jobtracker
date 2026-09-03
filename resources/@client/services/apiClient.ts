@@ -1,4 +1,4 @@
-// API client using native fetch to avoid missing module dependencies
+// API client using native fetch with timeout & status handling
 
 const BASE_URL = "https://jobtracker-adjt.onrender.com/api/v1";
 
@@ -54,12 +54,19 @@ export const apiClient = {
             ? endpoint
             : `${BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
 
+        // Set a 15-second timeout controller so requests never hang infinitely
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
         try {
             const response = await fetch(url, {
                 method,
                 headers: reqHeaders,
                 body: isFormData ? body : (body ? JSON.stringify(body) : undefined),
+                signal: controller.signal,
             });
+
+            clearTimeout(timeoutId);
 
             if (response.status === 401) {
                 localStorage.removeItem("auth_token");
@@ -73,8 +80,21 @@ export const apiClient = {
             }
 
             const json = await response.json();
+
+            if (!response.ok || json.status === "error") {
+                const errObj: any = new Error(json.message || "Request failed");
+                errObj.response = { data: json, status: response.status };
+                throw errObj;
+            }
+
             return { data: json };
-        } catch (err) {
+        } catch (err: any) {
+            clearTimeout(timeoutId);
+            if (err.name === "AbortError") {
+                const timeoutErr: any = new Error("Request timed out. Please try again.");
+                timeoutErr.response = { data: { message: "Request timed out." }, status: 408 };
+                return Promise.reject(timeoutErr);
+            }
             return Promise.reject(err);
         }
     },
