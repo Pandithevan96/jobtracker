@@ -81,12 +81,13 @@ class NotificationController extends Controller
 
             // Auto-backfill notification records for any Job Orders assigned to vendor that don't have a notification record yet
             if (!empty($myJobOrderIds)) {
-                $jobOrders = \App\Models\Job\JobOrder::with('vendor')->whereIn('id', $myJobOrderIds)->get();
+                $jobOrders = \App\Models\Job\JobOrder::with(['vendor', 'workspace', 'creator'])->whereIn('id', $myJobOrderIds)->get();
                 foreach ($jobOrders as $jo) {
                     $exists = Notification::where('job_order_id', $jo->id)
                         ->where('type', Notification::TYPE_JOB_CREATED)
                         ->exists();
                     if (!$exists) {
+                        $senderName = $jo->workspace?->name ?? $jo->creator?->name ?? 'Principal';
                         Notification::create([
                             'workspace_id'     => $jo->workspace_id,
                             'job_order_id'     => $jo->id,
@@ -97,10 +98,10 @@ class NotificationController extends Controller
                             'recipient_number' => $jo->vendor?->whatsapp_number ?? $jo->vendor?->phone ?? null,
                             'recipient_email'  => $jo->vendor?->email ?? null,
                             'message'          => sprintf(
-                                '📦 New Job Order %s (%s) has been assigned to %s. Quantity: %s %s.',
+                                '📦 New Job Order %s (%s) received from %s. Quantity: %s %s.',
                                 $jo->order_number,
                                 $jo->part_name,
-                                $jo->vendor?->shop_name ?? 'your shop',
+                                $senderName,
                                 $jo->quantity_sent,
                                 $jo->uom
                             ),
@@ -113,7 +114,7 @@ class NotificationController extends Controller
 
             $mode = $request->input('mode') ?? $request->header('X-App-Mode') ?? 'principal';
 
-            $query = Notification::with(['jobOrder', 'vendor', 'user']);
+            $query = Notification::with(['jobOrder.workspace', 'jobOrder.creator', 'vendor', 'user']);
 
             if ($mode === 'vendor') {
                 $query->where(function ($q) use ($myVendorIds, $myJobOrderIds, $user) {
@@ -151,7 +152,7 @@ class NotificationController extends Controller
 
             $notifications = $query->orderBy('created_at', 'desc')->get();
 
-            $formatted = $notifications->map(function ($n) {
+            $formatted = $notifications->map(function ($n) use ($mode) {
                 $typeLabel = 'system';
                 if ($n->type === Notification::TYPE_JOB_CREATED || $n->type === Notification::TYPE_STATUS_UPDATE) {
                     $typeLabel = 'job';
@@ -172,10 +173,18 @@ class NotificationController extends Controller
                     $title = 'Quality Rejection Alert';
                 }
 
+                $msg = $n->message;
+
+                // Format notification text for vendor view: state "received from <sender>" instead of "assigned to <vendor>"
+                if ($mode === 'vendor') {
+                    $senderName = $n->jobOrder?->workspace?->name ?? $n->user?->name ?? "pandideva's Workspace";
+                    $msg = preg_replace('/has been assigned to [^.]+/i', 'received from ' . $senderName, $msg);
+                }
+
                 return [
                     'id'         => $n->id,
                     'title'      => $title,
-                    'message'    => $n->message,
+                    'message'    => $msg,
                     'type'       => $typeLabel,
                     'created_at' => $n->created_at ? $n->created_at->diffForHumans() : 'Recently',
                     'read'       => $n->status === Notification::STATUS_DELIVERED || $n->status === Notification::STATUS_SENT,

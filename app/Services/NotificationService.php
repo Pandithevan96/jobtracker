@@ -178,17 +178,27 @@ class NotificationService
     public static function dispatchJobOrderCreated(JobOrder $jobOrder, User $createdBy): void
     {
         try {
-            $jobOrder->loadMissing('vendor');
-            $vendor = $jobOrder->vendor;
+            $jobOrder->loadMissing(['vendor', 'workspace', 'creator']);
+            $vendor     = $jobOrder->vendor;
+            $senderName = $jobOrder->workspace?->name ?? $createdBy->name ?? 'Principal';
+
+            $dueDateStr = 'N/A';
+            if ($jobOrder->due_date) {
+                try {
+                    $dueDateStr = \Carbon\Carbon::parse($jobOrder->due_date)->format('d M Y');
+                } catch (\Throwable $dtEx) {
+                    $dueDateStr = (string) $jobOrder->due_date;
+                }
+            }
 
             $message = sprintf(
-                '📦 New Job Order %s (%s) has been assigned to %s. Quantity: %s %s. Due: %s. Please log in to JobTrack to view details.',
+                '📦 New Job Order %s (%s) received from %s. Quantity: %s %s. Due: %s. Please log in to JobTrack to view details.',
                 $jobOrder->order_number,
                 $jobOrder->part_name,
-                $vendor?->shop_name ?? 'your shop',
+                $senderName,
                 $jobOrder->quantity_sent,
                 $jobOrder->uom,
-                optional($jobOrder->due_date)->format('d M Y') ?? $jobOrder->due_date
+                $dueDateStr
             );
 
             Notification::create([
@@ -201,11 +211,10 @@ class NotificationService
                 'recipient_number' => $vendor?->whatsapp_number ?? $vendor?->phone ?? null,
                 'recipient_email'  => $vendor?->email ?? null,
                 'message'          => $message,
-                'status'           => Notification::STATUS_PENDING, // Simulated until live API
+                'status'           => Notification::STATUS_PENDING,
                 'sent_at'          => now(),
             ]);
         } catch (\Throwable $e) {
-            // Notification failures must never break the main business flow
             Log::error('NotificationService::dispatchJobOrderCreated failed: ' . $e->getMessage());
         }
     }
