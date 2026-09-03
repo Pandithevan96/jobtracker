@@ -504,20 +504,19 @@ class JobOrderController extends Controller
                     $attachmentType = 'file';
                 }
 
-                // Use Cloudinary for persistent storage when credentials are configured.
-                // Falls back to Data URL (persistent in DB) when Cloudinary is not configured.
+                // 1. Use Cloudinary for persistent storage when credentials are configured.
                 if (config('cloudinary.cloud_name') && config('cloudinary.api_key') && config('cloudinary.api_secret')) {
                     try {
                         $cloudinary     = new CloudinaryService();
                         $uploaded       = $cloudinary->upload($file, config('cloudinary.folder', 'jobtracker') . '/note_attachments');
                         $attachmentUrl  = $uploaded['url'];
                     } catch (\Exception $cdnEx) {
-                        \Illuminate\Support\Facades\Log::warning('Cloudinary upload failed, using Data URL fallback: ' . $cdnEx->getMessage());
-                        $mime           = $file->getMimeType() ?: 'application/octet-stream';
-                        $base64Data     = base64_encode(file_get_contents($file->getRealPath()));
-                        $attachmentUrl  = "data:{$mime};base64,{$base64Data}";
+                        \Illuminate\Support\Facades\Log::warning('Cloudinary upload failed: ' . $cdnEx->getMessage());
                     }
-                } else {
+                }
+
+                // 2. Fallback to Data URL (stored in LONGTEXT in DB, never 404s)
+                if (!$attachmentUrl) {
                     $mime           = $file->getMimeType() ?: 'application/octet-stream';
                     $base64Data     = base64_encode(file_get_contents($file->getRealPath()));
                     $attachmentUrl  = "data:{$mime};base64,{$base64Data}";
@@ -538,25 +537,28 @@ class JobOrderController extends Controller
 
             $note->load('user');
 
-            // Broadcast the new note instantly via Reverb WebSocket
-            // so the other party (vendor or principal) sees it without reloading.
-            broadcast(new OrderNoteCreated(
-                jobOrderId: $jobOrder->id,
-                note: [
-                    'id'              => $note->id,
-                    'note'            => $note->note,
-                    'author_role'     => $note->author_role,
-                    'user_id'         => $note->user_id,
-                    'created_at'      => $note->created_at->toISOString(),
-                    'attachment_url'  => $note->attachment_url,
-                    'attachment_name' => $note->attachment_name,
-                    'attachment_type' => $note->attachment_type,
-                    'user'            => $note->user ? [
-                        'id'   => $note->user->id,
-                        'name' => $note->user->name,
-                    ] : null,
-                ]
-            ));
+            // Broadcast the new note instantly via Reverb WebSocket (wrapped in try/catch so broadcast failure never 500s)
+            try {
+                broadcast(new OrderNoteCreated(
+                    jobOrderId: $jobOrder->id,
+                    note: [
+                        'id'              => $note->id,
+                        'note'            => $note->note,
+                        'author_role'     => $note->author_role,
+                        'user_id'         => $note->user_id,
+                        'created_at'      => $note->created_at->toISOString(),
+                        'attachment_url'  => $note->attachment_url,
+                        'attachment_name' => $note->attachment_name,
+                        'attachment_type' => $note->attachment_type,
+                        'user'            => $note->user ? [
+                            'id'   => $note->user->id,
+                            'name' => $note->user->name,
+                        ] : null,
+                    ]
+                ));
+            } catch (\Throwable $bEx) {
+                \Illuminate\Support\Facades\Log::warning('WebSocket broadcast error (note saved anyway): ' . $bEx->getMessage());
+            }
 
             return HelperFunction::response($note, null, 'Note added successfully', 'success', '000', Response::HTTP_CREATED);
         } catch (Exception $e) {
