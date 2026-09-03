@@ -116,21 +116,26 @@ class NotificationController extends Controller
             $query = Notification::with(['jobOrder', 'vendor', 'user']);
 
             if ($mode === 'vendor') {
-                $query->where(function ($q) use ($resolvedWsId, $myVendorIds, $myJobOrderIds, $user) {
+                $query->where(function ($q) use ($myVendorIds, $myJobOrderIds, $user) {
+                    $hasCond = false;
                     if (!empty($myJobOrderIds)) {
                         $q->whereIn('job_order_id', $myJobOrderIds);
+                        $hasCond = true;
                     }
                     if (!empty($myVendorIds)) {
-                        $q->orWhereIn('vendor_id', $myVendorIds);
-                    }
-                    if ($resolvedWsId) {
-                        $q->orWhere('workspace_id', $resolvedWsId);
+                        if ($hasCond) $q->orWhereIn('vendor_id', $myVendorIds);
+                        else { $q->whereIn('vendor_id', $myVendorIds); $hasCond = true; }
                     }
                     if ($user->email) {
-                        $q->orWhere('recipient_email', $user->email);
+                        if ($hasCond) $q->orWhere('recipient_email', $user->email);
+                        else { $q->where('recipient_email', $user->email); $hasCond = true; }
                     }
                     if ($user->phone) {
-                        $q->orWhere('recipient_number', $user->phone);
+                        if ($hasCond) $q->orWhere('recipient_number', $user->phone);
+                        else { $q->where('recipient_number', $user->phone); $hasCond = true; }
+                    }
+                    if (!$hasCond) {
+                        $q->whereRaw('1 = 0');
                     }
                 });
             } else {
@@ -288,21 +293,26 @@ class NotificationController extends Controller
             $query = Notification::where('created_at', '>=', now()->subDays(30));
 
             if ($mode === 'vendor') {
-                $query->where(function ($q) use ($resolvedWsId, $myVendorIds, $myJobOrderIds, $user) {
-                    if ($resolvedWsId) {
-                        $q->where('workspace_id', $resolvedWsId);
+                $query->where(function ($q) use ($myVendorIds, $myJobOrderIds, $user) {
+                    $hasCond = false;
+                    if (!empty($myJobOrderIds)) {
+                        $q->whereIn('job_order_id', $myJobOrderIds);
+                        $hasCond = true;
                     }
                     if (!empty($myVendorIds)) {
-                        $q->orWhereIn('vendor_id', $myVendorIds);
-                    }
-                    if (!empty($myJobOrderIds)) {
-                        $q->orWhereIn('job_order_id', $myJobOrderIds);
+                        if ($hasCond) $q->orWhereIn('vendor_id', $myVendorIds);
+                        else { $q->whereIn('vendor_id', $myVendorIds); $hasCond = true; }
                     }
                     if ($user->email) {
-                        $q->orWhere('recipient_email', $user->email);
+                        if ($hasCond) $q->orWhere('recipient_email', $user->email);
+                        else { $q->where('recipient_email', $user->email); $hasCond = true; }
                     }
                     if ($user->phone) {
-                        $q->orWhere('recipient_number', $user->phone);
+                        if ($hasCond) $q->orWhere('recipient_number', $user->phone);
+                        else { $q->where('recipient_number', $user->phone); $hasCond = true; }
+                    }
+                    if (!$hasCond) {
+                        $q->whereRaw('1 = 0');
                     }
                 });
             } else {
