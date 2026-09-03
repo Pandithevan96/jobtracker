@@ -31,6 +31,9 @@ Route::prefix('v1')->group(function () {
     // Public WhatsApp Bot Webhook
     Route::post('whatsapp/webhook', 'Notification\WhatsappBotController@webhook');
 
+    // Public Challan PDF Stream Route (opens PDF directly in browser tab)
+    Route::get('challans/pdf/{id}', 'Challan\DeliveryChallanController@streamPdf');
+
     /*
     |--------------------------------------------------------------------------
     | Protected Routes (Bearer token required)
