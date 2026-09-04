@@ -1,5 +1,6 @@
 import React, { useState, FormEvent } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
 
 const API_BASE_URL = "https://jobtracker-adjt.onrender.com/api/v1";
 
@@ -27,6 +28,7 @@ interface RegisterPageProps {
 }
 
 export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
+    const navigate = useNavigate();
     const [name, setName] = useState<string>("");
     const [email, setEmail] = useState<string>("");
     const [password, setPassword] = useState<string>("");
@@ -90,7 +92,19 @@ export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
             }
 
             localStorage.setItem("auth_token", token);
-            onRegisterSuccess?.(token, user);
+            localStorage.setItem("auth_user", JSON.stringify(user));
+
+            if (onRegisterSuccess) {
+                onRegisterSuccess(token, user);
+            } else {
+                navigate("/login", {
+                    state: {
+                        registered: true,
+                        message: "Account created successfully! Please sign in with your password.",
+                        email: email.trim().toLowerCase(),
+                    },
+                });
+            }
         } catch (err) {
             const message =
                 err instanceof Error ? err.message : "Something went wrong.";
@@ -210,9 +224,9 @@ export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
 
                 <p className="text-center text-sm text-[#aaa] mt-4.5">
                     Already have an account?{" "}
-                    <a href="/login" className="text-[#f5a623] font-bold no-underline hover:underline">
+                    <Link to="/login" className="text-[#f5a623] font-bold no-underline hover:underline">
                         Sign In
-                    </a>
+                    </Link>
                 </p>
             </form>
 

@@ -1,5 +1,6 @@
 import React, { useState, FormEvent } from "react";
-import { Eye, EyeOff, ArrowLeft, KeyRound, Mail, Lock, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, KeyRound, Mail, Lock, ShieldCheck, CheckCircle2 } from "lucide-react";
+import { useLocation, Link } from "react-router-dom";
 
 const API_BASE_URL = "https://jobtracker-adjt.onrender.com/api/v1";
 
@@ -42,12 +43,16 @@ function validatePassword(pw: string): string {
 }
 
 export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
+    const location = useLocation();
+    const locationState = location.state as { registered?: boolean; message?: string; email?: string } | null;
+
     // ── Login state ──
-    const [email, setEmail] = useState<string>("");
+    const [email, setEmail] = useState<string>(() => locationState?.email || "");
     const [password, setPassword] = useState<string>("");
     const [showPassword, setShowPassword] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string>("");
+    const [successMessage, setSuccessMessage] = useState<string>(() => locationState?.message || "");
     const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
     // ── Forgot Password state ──
@@ -277,6 +282,13 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             >
                 <h2 className="text-lg font-bold text-white mb-5">Sign In</h2>
 
+                {successMessage && (
+                    <div className="bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 rounded-lg px-3 py-2.5 text-sm mb-4 flex items-center gap-2">
+                        <CheckCircle2 size={18} className="shrink-0 text-emerald-400" />
+                        <span>{successMessage}</span>
+                    </div>
+                )}
+
                 {error && (
                     <div className="bg-red-500/15 border border-red-500/40 text-[#ff8080] rounded-lg px-3 py-2.5 text-sm mb-4">
                         {error}
@@ -341,7 +353,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
                 <p className="text-center text-sm text-[#aaa] mt-4">
                     Don&apos;t have an account?{" "}
-                    <a href="/register" className="text-[#f5a623] font-bold no-underline hover:underline">Register</a>
+                    <Link to="/register" className="text-[#f5a623] font-bold no-underline hover:underline">Register</Link>
                 </p>
             </form>
 
