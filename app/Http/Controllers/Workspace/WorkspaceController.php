@@ -131,33 +131,6 @@ class WorkspaceController extends Controller
                 })
                 ->get();
 
-            if ($workspaces->isEmpty()) {
-                $defaultName = ($user->name ? $user->name . "'s Workspace" : "My Workspace");
-                $slug = Str::slug($defaultName);
-                $originalSlug = $slug;
-                $count = 1;
-                while (Workspace::where('slug', $slug)->exists()) {
-                    $slug = $originalSlug . '-' . $count;
-                    $count++;
-                }
-
-                $workspace = Workspace::create([
-                    'owner_id'            => $user->id,
-                    'name'                => $defaultName,
-                    'slug'                => $slug,
-                    'plan'                => Workspace::PLAN_FREE,
-                    'status'              => Workspace::STATUS_ACTIVE,
-                    'dc_count_this_month' => 0,
-                ]);
-
-                $workspace->members()->attach($user->id, [
-                    'role'   => 1, // Principal
-                    'status' => 1, // Active
-                ]);
-
-                $workspaces = collect([$workspace]);
-            }
-
             return HelperFunction::response($workspaces, null, 'Workspaces fetched successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
             return HelperFunction::response(null, null, 'Failed to list workspaces: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);

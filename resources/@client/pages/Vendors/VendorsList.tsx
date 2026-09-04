@@ -86,6 +86,12 @@ export const VendorsList: React.FC = () => {
     const [selectedNetworkWsId, setSelectedNetworkWsId] = useState<string>("");
     const [isCustomVendor, setIsCustomVendor] = useState(false);
 
+    const [hasWorkspace, setHasWorkspace] = useState<boolean>(true);
+    const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] = useState<boolean>(false);
+    const [wsForm, setWsForm] = useState({ name: "", phone: "", city: "Coimbatore", gstin: "" });
+    const [creatingWs, setCreatingWs] = useState<boolean>(false);
+    const [createWsError, setCreateWsError] = useState<string | null>(null);
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
@@ -98,6 +104,13 @@ export const VendorsList: React.FC = () => {
 
     const fetchVendors = async () => {
         const workspaceId = await getCurrentWorkspaceId();
+        if (!workspaceId) {
+            setHasWorkspace(false);
+            setVendors([]);
+            setLoading(false);
+            return;
+        }
+        setHasWorkspace(true);
         setLoading(true);
         setError(null);
         try {
@@ -175,11 +188,58 @@ export const VendorsList: React.FC = () => {
         }
     };
 
-    const handleOpenCreateModal = () => {
+    const handleOpenCreateModal = async () => {
+        const workspaceId = await getCurrentWorkspaceId();
+        if (!workspaceId) {
+            setHasWorkspace(false);
+            setCreateWsError(null);
+            setShowCreateWorkspaceModal(true);
+            return;
+        }
+        setHasWorkspace(true);
         fetchNetworkWorkspaces();
         setIsCustomVendor(false);
         setSelectedNetworkWsId("");
         setShowCreateModal(true);
+    };
+
+    const handleCreateWorkspaceSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!wsForm.name.trim()) {
+            setCreateWsError("Please enter your company / workspace name.");
+            return;
+        }
+        setCreatingWs(true);
+        setCreateWsError(null);
+        try {
+            const res = await apiClient.post("/workspaces/create", {
+                name: wsForm.name.trim(),
+                phone: wsForm.phone.trim(),
+                city: wsForm.city.trim(),
+                gstin: wsForm.gstin.trim(),
+            });
+
+            if (res.data?.status === "error") {
+                setCreateWsError(res.data.message || "Failed to create workspace.");
+                return;
+            }
+
+            const createdWs = res.data?.data;
+            if (createdWs?.id) {
+                localStorage.setItem("workspace_id", String(createdWs.id));
+                localStorage.setItem("workspace_name", createdWs.name);
+                setHasWorkspace(true);
+                setShowCreateWorkspaceModal(false);
+                fetchVendors();
+                handleOpenCreateModal();
+            }
+        } catch (err: any) {
+            setCreateWsError(
+                err?.response?.data?.message || err?.message || "Failed to create workspace."
+            );
+        } finally {
+            setCreatingWs(false);
+        }
     };
 
     const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -271,6 +331,27 @@ export const VendorsList: React.FC = () => {
                     <span>Add Vendor</span>
                 </button>
             </div>
+
+            {/* Workspace Required Banner */}
+            {!hasWorkspace && !loading && (
+                <div className="bg-[#1e1b04] border border-[#f5a623]/40 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                        <AlertCircle size={24} className="text-[#f5a623] shrink-0 mt-0.5" />
+                        <div>
+                            <h3 className="text-sm font-bold text-white">Workspace Required</h3>
+                            <p className="text-xs text-[#aaa] mt-0.5">
+                                You have not created a company workspace yet. A workspace must be added first before you can register vendors or subcontractors.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => setShowCreateWorkspaceModal(true)}
+                        className="bg-[#f5a623] hover:bg-[#e0951c] text-black font-bold text-xs px-4 py-2.5 rounded-xl border-none cursor-pointer shrink-0"
+                    >
+                        + Create Workspace First
+                    </button>
+                </div>
+            )}
 
             {/* Search */}
             <div className="flex items-center justify-between gap-4 bg-[#141414] border border-[#262626] p-4 rounded-2xl">
@@ -616,6 +697,112 @@ export const VendorsList: React.FC = () => {
                                     disabled={creating}
                                 >
                                     {creating ? "Saving..." : "Save Vendor"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Create Workspace Modal */}
+            {showCreateWorkspaceModal && (
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-[#141414] border border-[#2a2a2a] w-full max-w-md rounded-2xl p-6 relative">
+                        <button
+                            onClick={() => setShowCreateWorkspaceModal(false)}
+                            className="absolute top-4 right-4 text-[#888] hover:text-white bg-transparent border-none cursor-pointer"
+                        >
+                            <X size={20} />
+                        </button>
+
+                        <div className="w-12 h-12 rounded-2xl bg-[#f5a623]/15 text-[#f5a623] flex items-center justify-center mb-3">
+                            <Building2 size={24} />
+                        </div>
+
+                        <h2 className="text-lg font-bold text-white mb-1">
+                            Create Workspace First
+                        </h2>
+                        <p className="text-xs text-[#888] mb-4">
+                            Before adding vendors, you must set up your company workspace profile.
+                        </p>
+
+                        {createWsError && (
+                            <div className="mb-4 flex items-center gap-2 text-xs text-red-300 bg-[#2a1414] border border-[#3a1f1f] rounded-xl px-3 py-2">
+                                <AlertCircle size={14} />
+                                {createWsError}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleCreateWorkspaceSubmit} className="space-y-4 text-xs">
+                            <div>
+                                <label className="block text-[#aaa] font-semibold mb-1">
+                                    Company / Workspace Name *
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="e.g. Apex Engineering Works"
+                                    value={wsForm.name}
+                                    onChange={(e) => setWsForm({ ...wsForm, name: e.target.value })}
+                                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-white px-3.5 py-2.5 focus:outline-none focus:border-[#f5a623]"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-[#aaa] font-semibold mb-1">
+                                        Phone Number
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="+91 98401 23456"
+                                        value={wsForm.phone}
+                                        onChange={(e) => setWsForm({ ...wsForm, phone: e.target.value })}
+                                        className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-white px-3.5 py-2.5 focus:outline-none focus:border-[#f5a623]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[#aaa] font-semibold mb-1">
+                                        City
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="Coimbatore"
+                                        value={wsForm.city}
+                                        onChange={(e) => setWsForm({ ...wsForm, city: e.target.value })}
+                                        className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-white px-3.5 py-2.5 focus:outline-none focus:border-[#f5a623]"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-[#aaa] font-semibold mb-1">
+                                    GSTIN (Optional)
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="33AAAAA0000A1Z5"
+                                    value={wsForm.gstin}
+                                    onChange={(e) => setWsForm({ ...wsForm, gstin: e.target.value })}
+                                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-white px-3.5 py-2.5 focus:outline-none focus:border-[#f5a623]"
+                                />
+                            </div>
+
+                            <div className="pt-2 flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCreateWorkspaceModal(false)}
+                                    className="flex-1 bg-[#222] hover:bg-[#2a2a2a] text-[#aaa] font-bold py-3 rounded-xl border-none cursor-pointer"
+                                    disabled={creatingWs}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 bg-[#f5a623] hover:bg-[#e0951c] text-black font-bold py-3 rounded-xl border-none cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
+                                    disabled={creatingWs}
+                                >
+                                    {creatingWs ? "Creating..." : "Create & Continue"}
                                 </button>
                             </div>
                         </form>

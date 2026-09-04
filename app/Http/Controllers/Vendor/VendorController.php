@@ -26,7 +26,7 @@ class VendorController extends Controller
 
             $user = Auth::user();
 
-            // Auto-resolve workspace_id if omitted
+            // Check if user has a workspace or resolve workspace_id
             if (!$request->filled('workspace_id')) {
                 $workspace = Workspace::where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
@@ -34,6 +34,15 @@ class VendorController extends Controller
                 })->first();
                 if ($workspace) {
                     $request->merge(['workspace_id' => $workspace->id]);
+                } else {
+                    return HelperFunction::response(
+                        null,
+                        null,
+                        'Workspace not created yet. Please set up your company workspace before adding vendors.',
+                        'error',
+                        '001',
+                        Response::HTTP_BAD_REQUEST
+                    );
                 }
             }
 
@@ -66,7 +75,7 @@ class VendorController extends Controller
                 ->first();
 
             if (!$workspace) {
-                return HelperFunction::response(null, null, 'Workspace not found or you do not belong to it', 'error', '005', Response::HTTP_FORBIDDEN);
+                return HelperFunction::response(null, null, 'Workspace not found. Please create a workspace first before adding vendors.', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             $currentCount = Vendor::where('workspace_id', $workspaceId)->count();

@@ -101,7 +101,11 @@ export const WorkspaceSettingsPage: React.FC = () => {
 
         const id = await getCurrentWorkspaceId();
         if (!id) {
-            setError("No workspace selected — cannot load settings.");
+            setWorkspaceId(null);
+            setForm((f) => ({
+                ...f,
+                name: user?.name ? `${user.name}'s Company` : "",
+            }));
             setLoading(false);
             return;
         }
@@ -150,17 +154,15 @@ export const WorkspaceSettingsPage: React.FC = () => {
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!workspaceId) return;
-
         setSaving(true);
         setSaveError(null);
         setSaved(false);
 
         try {
-            const res = await apiClient.post("/workspaces/update", {
-                id: workspaceId,
-                ...form,
-            });
+            const endpoint = workspaceId ? "/workspaces/update" : "/workspaces/create";
+            const payload = workspaceId ? { id: workspaceId, ...form } : { ...form };
+
+            const res = await apiClient.post(endpoint, payload);
 
             if (res.data?.status === "error") {
                 setSaveError(
@@ -169,18 +171,25 @@ export const WorkspaceSettingsPage: React.FC = () => {
                 return;
             }
 
-            // Keep the cached workspace_name in sync with Layout.tsx's header display
-            localStorage.setItem("workspace_name", form.name);
+            const createdOrUpdated = res.data?.data;
+            if (createdOrUpdated?.id) {
+                setWorkspaceId(createdOrUpdated.id);
+                localStorage.setItem("workspace_id", String(createdOrUpdated.id));
+                localStorage.setItem("workspace_name", createdOrUpdated.name || form.name);
+            }
 
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
+            if (!workspaceId) {
+                window.location.reload();
+            }
         } catch (e: any) {
             setSaveError(
                 e?.response?.data?.message ||
                     e?.message ||
                     "Failed to save workspace settings",
             );
-            console.error("Workspace update failed:", e);
+            console.error("Workspace save failed:", e);
         } finally {
             setSaving(false);
         }
@@ -423,7 +432,7 @@ export const WorkspaceSettingsPage: React.FC = () => {
                         ) : (
                             <Save size={16} />
                         )}
-                        {saving ? "Saving..." : "Save Changes"}
+                        {saving ? "Saving..." : workspaceId ? "Save Changes" : "Create Workspace"}
                     </button>
                 </div>
             </form>
