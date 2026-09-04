@@ -120,8 +120,9 @@ export const VendorDetail: React.FC = () => {
             <h3 className="text-sm font-bold text-white mb-3">Process Capabilities</h3>
             <div className="flex flex-wrap gap-2">
               {vendor.capabilities.map((cap, idx) => (
-                <span key={idx} className="bg-[#1a1a1a] border border-[#2a2a2a] text-gray-200 text-xs px-3 py-1.5 rounded-xl font-medium">
-                  ⚡ {cap}
+                <span key={idx} className="bg-[#1a1a1a] border border-[#2a2a2a] text-gray-200 text-xs px-3 py-1.5 rounded-xl font-medium flex items-center gap-1.5">
+                  <CheckCircle2 size={13} className="text-[#f5a623]" />
+                  <span>{cap}</span>
                 </span>
               ))}
             </div>

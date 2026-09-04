@@ -270,8 +270,7 @@ export const Dashboard: React.FC = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-[#191919] to-[#141414] p-6 rounded-2xl border border-[#2a2a2a]">
                 <div>
                     <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-                        {appMode === 'vendor' ? 'Received Orders Overview' : 'Operational Overview'}{" "}
-                        <span className="text-[#f5a623]">⚡</span>
+                        {appMode === 'vendor' ? 'Received Orders Overview' : 'Operational Overview'}
                     </h1>
                     <p className="text-sm text-[#888] mt-1">
                         {appMode === 'vendor'

@@ -201,7 +201,6 @@ export const Layout: React.FC = () => {
                         to="/dashboard"
                         className="flex items-center gap-2.5 no-underline"
                     >
-                        <span className="text-2xl">📋</span>
                         <span className="font-black text-xl tracking-tight text-[#f5a623]">
                             JobTrack
                         </span>
@@ -445,7 +444,6 @@ export const Layout: React.FC = () => {
                         <div className="w-4/5 max-w-xs bg-[#141414] border-r border-[#262626] h-full flex flex-col p-4">
                             <div className="flex items-center justify-between pb-4 mb-4 border-b border-[#262626]">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-2xl">📋</span>
                                     <span className="font-extrabold text-lg text-[#f5a623]">
                                         JobTrack
                                     </span>

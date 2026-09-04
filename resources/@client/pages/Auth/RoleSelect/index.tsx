@@ -116,7 +116,6 @@ export default function RoleSelectPage() {
     <div className="min-h-screen bg-[#0d0d0d] flex flex-col items-center justify-center p-6">
       {/* Header */}
       <div className="text-center mb-10">
-        <div className="text-5xl mb-4">📋</div>
         <h1 className="text-3xl font-extrabold text-[#f5a623] mb-2">JobTrack</h1>
         <p className="text-sm text-[#888]">
           Welcome back, <span className="text-white font-semibold">{user?.name}</span>!

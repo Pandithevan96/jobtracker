@@ -578,7 +578,7 @@ export const VendorsList: React.FC = () => {
                                             </option>
                                             {networkWorkspaces.map((ws) => (
                                                 <option key={ws.id} value={ws.id}>
-                                                    🏢 {ws.name} {ws.city ? `(${ws.city})` : ''} {ws.contact_person ? `— Owner: ${ws.contact_person}` : ''}
+                                                    {ws.name} {ws.city ? `(${ws.city})` : ''} {ws.contact_person ? `— Owner: ${ws.contact_person}` : ''}
                                                 </option>
                                             ))}
                                             <option value="CUSTOM">+ Other Custom / Unregistered Vendor...</option>

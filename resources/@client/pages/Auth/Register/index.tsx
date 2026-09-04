@@ -117,7 +117,6 @@ export default function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-[#0d0d0d] p-6 font-sans">
             <div className="text-center mb-8">
-                <div className="text-5xl mb-3">📋</div>
                 <h1 className="text-3xl font-extrabold text-[#f5a623] m-0">
                     JobTrack
                 </h1>
