@@ -11,6 +11,7 @@ interface DatePickerProps {
   hasError?: boolean;
   disabled?: boolean;
   id?: string;
+  align?: 'left' | 'right' | 'auto';
 }
 
 const MONTHS = [
@@ -49,6 +50,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   hasError = false,
   disabled = false,
   id,
+  align = 'auto',
 }) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -86,13 +88,24 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     }
   }, [value]);
 
-  // Flip direction if near bottom of viewport
+  // Flip vertical & horizontal direction if near bottom/right edge
   const [dropUp, setDropUp] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
+
   const toggleOpen = () => {
     if (disabled) return;
     if (!open && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       setDropUp(rect.bottom + 340 > window.innerHeight);
+
+      if (align === 'right') {
+        setAlignRight(true);
+      } else if (align === 'left') {
+        setAlignRight(false);
+      } else {
+        const spaceOnRight = window.innerWidth - rect.left;
+        setAlignRight(spaceOnRight < 300 || rect.left > window.innerWidth / 2);
+      }
     }
     setOpen((v) => !v);
     setYearPickMode(false);
@@ -165,7 +178,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
           ref={dropdownRef}
           className={`absolute z-[9999] w-72 bg-[#1a1a1a] border border-[#333] rounded-2xl shadow-2xl overflow-hidden ${
             dropUp ? 'bottom-full mb-1' : 'top-full mt-1'
-          } left-0`}
+          } ${alignRight ? 'right-0' : 'left-0'}`}
           style={{ minWidth: '17rem' }}
         >
           {/* Header */}

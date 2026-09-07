@@ -343,7 +343,7 @@ export const InvoicesList: React.FC = () => {
               </button>
             </div>
 
-            <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4 text-xs">
+            <div className="overflow-y-auto overflow-x-hidden flex-1 px-6 py-4 space-y-4 text-xs">
               {createError && (
                 <div className="flex items-center gap-2 text-red-300 bg-rose-500/10 border border-rose-500/30 rounded-xl p-3">
                   <AlertCircle size={14} className="shrink-0" /> {createError}
@@ -419,6 +419,7 @@ export const InvoicesList: React.FC = () => {
                     min={form.invoice_date}
                     placeholder="Select due date"
                     onChange={(d) => setForm({ ...form, due_date: d })}
+                    align="right"
                   />
                 </div>
               </div>

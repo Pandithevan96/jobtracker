@@ -437,7 +437,7 @@ export const ChallansList: React.FC = () => {
             </div>
 
             {/* Scrollable body */}
-            <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4 text-xs">
+            <div className="overflow-y-auto overflow-x-hidden flex-1 px-6 py-4 space-y-4 text-xs">
 
               {createError && (
                 <div className="flex items-start gap-2 text-red-300 bg-rose-500/10 border border-rose-500/30 rounded-xl px-3 py-2.5">
@@ -534,6 +534,7 @@ export const ChallansList: React.FC = () => {
                     min={form.dispatch_date}
                     placeholder="Select delivery date"
                     onChange={(d) => setForm({ ...form, estimated_delivery: d })}
+                    align="right"
                   />
                 </div>
               </div>
