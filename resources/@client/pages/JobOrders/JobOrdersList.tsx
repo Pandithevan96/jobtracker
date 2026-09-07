@@ -59,7 +59,8 @@ export const JobOrdersList: React.FC = () => {
     vendor_id: '',
     part_name: '',
     part_number: '',
-    process_type: 'Machining',
+    process_type: 'CNC Machining',
+    custom_process_type: '',
     quantity_sent: 100,
     due_date: getTodayDate(),
     notes: '',
@@ -271,11 +272,16 @@ export const JobOrdersList: React.FC = () => {
     setCreating(true);
     try {
       const workspaceId = await getCurrentWorkspaceId();
+      const finalProcessType =
+        newOrder.process_type === 'Other'
+          ? (newOrder.custom_process_type.trim() || 'Custom Job Work')
+          : newOrder.process_type;
+
       const payload: Record<string, any> = {
         vendor_id: Number(newOrder.vendor_id),
         part_name: newOrder.part_name.trim(),
         part_number: newOrder.part_number.trim(),
-        process_type: newOrder.process_type,
+        process_type: finalProcessType,
         quantity_sent: Number(newOrder.quantity_sent),
         due_date: newOrder.due_date,
         notes: newOrder.notes.trim(),
@@ -294,7 +300,8 @@ export const JobOrdersList: React.FC = () => {
         vendor_id: vendors.length > 0 ? String(vendors[0].id) : '',
         part_name: '',
         part_number: '',
-        process_type: 'Machining',
+        process_type: 'CNC Machining',
+        custom_process_type: '',
         quantity_sent: 100,
         due_date: getTodayDate(),
         notes: '',
@@ -633,8 +640,8 @@ export const JobOrdersList: React.FC = () => {
                 />
               </div>
 
+              {/* Process Type & Quantity */}
               <div className="grid grid-cols-2 gap-4">
-                {/* Process Type */}
                 <div>
                   <label className="block text-[#aaa] font-semibold mb-1">Process Type</label>
                   <select
@@ -642,12 +649,58 @@ export const JobOrdersList: React.FC = () => {
                     onChange={(e) => setNewOrder({ ...newOrder, process_type: e.target.value })}
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-white px-3 py-2.5 focus:outline-none focus:border-[#f5a623]"
                   >
-                    <option value="Machining">CNC Machining</option>
-                    <option value="Heat Treatment">Heat Treatment</option>
-                    <option value="Anodizing">Anodizing / Coating</option>
-                    <option value="Grinding">Precision Grinding</option>
-                    <option value="Turning">Turning</option>
-                    <option value="Assembly">Assembly</option>
+                    <optgroup label="CNC & Precision Machining">
+                      <option value="CNC Machining">CNC Milling / VMC</option>
+                      <option value="CNC Turning">CNC Turning / Lathe</option>
+                      <option value="5-Axis Machining">5-Axis CNC Machining</option>
+                      <option value="HMC Machining">HMC Horizontal Machining</option>
+                      <option value="Wire EDM">Wire EDM / Spark Erosion</option>
+                      <option value="Jig Boring">Jig Boring & Slotting</option>
+                    </optgroup>
+                    <optgroup label="Forming & Sheet Metal">
+                      <option value="Laser Cutting & Bending">Laser Cutting & CNC Bending</option>
+                      <option value="Sheet Metal Stamping">Sheet Metal Stamping & Press Work</option>
+                      <option value="Hot/Cold Forging">Hot / Cold Forging</option>
+                      <option value="Deep Drawing">Deep Drawing & Blanking</option>
+                    </optgroup>
+                    <optgroup label="Casting & Foundry">
+                      <option value="Sand Casting">Sand / Shell Moulding Casting</option>
+                      <option value="Investment Casting">Investment / Die Casting (HPDC/LPDC)</option>
+                      <option value="Fettling & Shot Blasting">Fettling & Shot Blasting</option>
+                    </optgroup>
+                    <optgroup label="Heat Treatment">
+                      <option value="Case Hardening">Case Hardening / Carburizing</option>
+                      <option value="Induction Hardening">Induction Hardening</option>
+                      <option value="Nitriding">Gas / Ion Nitriding</option>
+                      <option value="Annealing & Tempering">Annealing, Quenching & Tempering</option>
+                      <option value="Vacuum Heat Treatment">Vacuum Heat Treatment</option>
+                    </optgroup>
+                    <optgroup label="Surface Treatment & Plating">
+                      <option value="Anodizing / Coating">Anodizing / Hard Anodizing</option>
+                      <option value="Electroplating">Zinc / Chrome / Nickel Plating</option>
+                      <option value="Powder Coating">Powder Coating & Industrial Painting</option>
+                      <option value="Phosphating">Phosphating & Blackodising</option>
+                      <option value="CED Coating">CED / E-Coating</option>
+                    </optgroup>
+                    <optgroup label="Grinding & Honing">
+                      <option value="Cylindrical Grinding">Cylindrical & Centerless Grinding</option>
+                      <option value="Surface Grinding">Precision Surface Grinding</option>
+                      <option value="Honing">Cylinder Honing</option>
+                      <option value="Gear Hobbing">Gear Hobbing & Gear Grinding</option>
+                    </optgroup>
+                    <optgroup label="Welding & Fabrication">
+                      <option value="MIG/TIG Welding">MIG / TIG / Laser Welding</option>
+                      <option value="Structural Fabrication">Heavy Structural Fabrication</option>
+                      <option value="Robotic Welding">Robotic & Spot Welding</option>
+                    </optgroup>
+                    <optgroup label="Inspection & Assembly">
+                      <option value="CMM & NDT Inspection">CMM Inspection & NDT Testing</option>
+                      <option value="Dynamic Balancing">Dynamic Balancing & Hydrostatic Test</option>
+                      <option value="Sub-Assembly">Sub-Assembly & Wiring</option>
+                    </optgroup>
+                    <optgroup label="Custom / Special">
+                      <option value="Other">Other / Custom Process...</option>
+                    </optgroup>
                   </select>
                 </div>
 
@@ -666,6 +719,22 @@ export const JobOrdersList: React.FC = () => {
                   {fieldErrors.quantity_sent && <p className="text-red-400 mt-1 flex items-center gap-1"><AlertCircle size={11} />{fieldErrors.quantity_sent}</p>}
                 </div>
               </div>
+
+              {/* Custom Process Input if "Other" is selected */}
+              {newOrder.process_type === 'Other' && (
+                <div>
+                  <label className="block text-[#aaa] font-semibold mb-1">
+                    Specify Custom Process Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Electroless Nickel Plating (ENP)"
+                    value={newOrder.custom_process_type}
+                    onChange={(e) => setNewOrder({ ...newOrder, custom_process_type: e.target.value })}
+                    className="w-full bg-[#1a1a1a] border border-[#f5a623] rounded-xl text-white px-3.5 py-2.5 focus:outline-none"
+                  />
+                </div>
+              )}
 
               {/* Due Date */}
               <div>
