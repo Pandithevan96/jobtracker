@@ -19,6 +19,8 @@ import {
     Plus,
     RefreshCw,
     PackageCheck,
+    IndianRupee,
+    FileSpreadsheet,
 } from "lucide-react";
 
 export const Layout: React.FC = () => {
@@ -149,6 +151,8 @@ export const Layout: React.FC = () => {
             principalOnly: false,
         },
         { name: "Delivery Challans", path: "/challans", icon: Truck, principalOnly: false },
+        { name: "Job Work Invoices", path: "/invoices", icon: IndianRupee, principalOnly: true },
+        { name: "Form GST ITC-04", path: "/reports/itc04", icon: FileSpreadsheet, principalOnly: true },
         {
             name: "Quality Rejections",
             path: "/rejections",

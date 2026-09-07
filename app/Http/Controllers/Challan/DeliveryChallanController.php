@@ -109,23 +109,28 @@ class DeliveryChallanController extends Controller
             }
 
             $validation = Validator::make($request->all(), [
-                'workspace_id'       => 'required|integer|exists:workspaces,id',
-                'job_order_id'       => 'required|integer|exists:job_orders,id',
-                'vendor_id'          => 'required|integer|exists:vendors,id',
-                'type'               => 'required|integer|in:1,2', // 1-Outward, 2-Inward
-                'dispatch_date'      => 'nullable|date',
-                'estimated_delivery' => 'nullable|date|after_or_equal:dispatch_date',
-                'vehicle_number'     => 'nullable|string|max:20',
-                'driver_name'        => 'nullable|string|max:100',
-                'notes'              => 'nullable|string',
-                'items'              => 'required|array|min:1',
-                'items.*.part_name'  => 'required|string|max:255',
-                'items.*.part_number'=> 'nullable|string|max:100',
-                'items.*.hsn_code'   => 'nullable|string|max:20',
-                'items.*.quantity'   => 'required|numeric|min:0.01',
-                'items.*.uom'        => 'nullable|string|max:20',
-                'items.*.unit_value' => 'nullable|numeric|min:0',
-                'items.*.description'=> 'nullable|string',
+                'workspace_id'        => 'required|integer|exists:workspaces,id',
+                'job_order_id'        => 'required|integer|exists:job_orders,id',
+                'vendor_id'           => 'required|integer|exists:vendors,id',
+                'parent_challan_id'   => 'nullable|integer|exists:delivery_challans,id',
+                'type'                => 'required|integer|in:1,2', // 1-Outward, 2-Inward
+                'purpose_of_movement' => 'nullable|string|max:255',
+                'vendor_dc_number'    => 'nullable|string|max:50',
+                'dispatch_date'       => 'nullable|date',
+                'estimated_delivery'  => 'nullable|date|after_or_equal:dispatch_date',
+                'vehicle_number'      => 'nullable|string|max:20',
+                'eway_bill_number'    => 'nullable|string|max:50',
+                'driver_name'         => 'nullable|string|max:100',
+                'transporter_id'      => 'nullable|string|max:50',
+                'notes'               => 'nullable|string',
+                'items'               => 'required|array|min:1',
+                'items.*.part_name'   => 'required|string|max:255',
+                'items.*.part_number' => 'nullable|string|max:100',
+                'items.*.hsn_code'    => 'nullable|string|max:20',
+                'items.*.quantity'    => 'required|numeric|min:0.01',
+                'items.*.uom'         => 'nullable|string|max:20',
+                'items.*.unit_value'  => 'nullable|numeric|min:0',
+                'items.*.description' => 'nullable|string',
             ]);
 
             if ($validation->fails()) {
@@ -179,17 +184,22 @@ class DeliveryChallanController extends Controller
             DB::beginTransaction();
 
             $challan = DeliveryChallan::create([
-                'workspace_id'       => $workspaceId,
-                'job_order_id'       => $jobOrder->id,
-                'vendor_id'          => $vendor->id,
-                'created_by'         => $user->id,
-                'type'               => $request->input('type'),
-                'status'             => DeliveryChallan::STATUS_ISSUED,
-                'dispatch_date'      => $request->input('dispatch_date'),
-                'estimated_delivery' => $request->input('estimated_delivery'),
-                'vehicle_number'     => $request->input('vehicle_number'),
-                'driver_name'        => $request->input('driver_name'),
-                'notes'              => $request->input('notes'),
+                'workspace_id'        => $workspaceId,
+                'job_order_id'        => $jobOrder->id,
+                'vendor_id'           => $vendor->id,
+                'parent_challan_id'   => $request->input('parent_challan_id'),
+                'created_by'          => $user->id,
+                'type'                => $request->input('type'),
+                'purpose_of_movement' => $request->input('purpose_of_movement', ($request->input('type') == 1 ? 'Sent for job work under Rule 55' : 'Returned after job work under Rule 55')),
+                'vendor_dc_number'    => $request->input('vendor_dc_number'),
+                'status'              => DeliveryChallan::STATUS_ISSUED,
+                'dispatch_date'       => $request->input('dispatch_date'),
+                'estimated_delivery'  => $request->input('estimated_delivery'),
+                'vehicle_number'      => $request->input('vehicle_number'),
+                'eway_bill_number'    => $request->input('eway_bill_number'),
+                'driver_name'         => $request->input('driver_name'),
+                'transporter_id'      => $request->input('transporter_id'),
+                'notes'               => $request->input('notes'),
             ]);
 
             foreach ($request->input('items') as $item) {
@@ -281,7 +291,7 @@ class DeliveryChallanController extends Controller
                 })
                 ->pluck('id');
 
-            $query = DeliveryChallan::with(['vendor', 'jobOrder', 'creator']);
+            $query = DeliveryChallan::with(['vendor', 'jobOrder', 'creator', 'parentChallan', 'returnChallans']);
 
             $mode = $request->input('mode') ?? $request->header('X-App-Mode') ?? 'principal';
 
@@ -353,7 +363,7 @@ class DeliveryChallanController extends Controller
             }
 
             $user = Auth::user();
-            $challan = DeliveryChallan::with(['items', 'vendor', 'jobOrder', 'creator', 'acknowledgedBy'])
+            $challan = DeliveryChallan::with(['items', 'vendor', 'jobOrder', 'creator', 'acknowledgedBy', 'parentChallan', 'returnChallans'])
                 ->find($request->input('id'));
 
             $workspace = $this->resolveWorkspace($challan->workspace_id, $user);

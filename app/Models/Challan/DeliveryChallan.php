@@ -49,12 +49,17 @@ class DeliveryChallan extends Model
         'workspace_id',
         'job_order_id',
         'vendor_id',
+        'parent_challan_id',
         'created_by',
         'challan_number',
+        'vendor_dc_number',
         'type',
+        'purpose_of_movement',
         'status',
         'vehicle_number',
+        'eway_bill_number',
         'driver_name',
+        'transporter_id',
         'dispatch_date',
         'estimated_delivery',
         'acknowledged_at',
@@ -117,6 +122,16 @@ class DeliveryChallan extends Model
     public function vendor()
     {
         return $this->belongsTo(\App\Models\Vendor\Vendor::class, 'vendor_id');
+    }
+
+    public function parentChallan()
+    {
+        return $this->belongsTo(self::class, 'parent_challan_id');
+    }
+
+    public function returnChallans()
+    {
+        return $this->hasMany(self::class, 'parent_challan_id');
     }
 
     public function creator()

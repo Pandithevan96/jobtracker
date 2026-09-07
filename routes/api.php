@@ -104,6 +104,20 @@ Route::prefix('v1')->group(function () {
             Route::post('details',     'Job\MaterialReconciliationController@details');
         });
 
+        // Job Work Tax Invoice Routes
+        Route::prefix('invoices')->group(function () {
+            Route::post('create',        'Billing\JobWorkInvoiceController@store');
+            Route::post('list',          'Billing\JobWorkInvoiceController@list');
+            Route::post('details',       'Billing\JobWorkInvoiceController@details');
+            Route::post('update-status', 'Billing\JobWorkInvoiceController@updateStatus');
+        });
+
+        // Form GST ITC-04 Report Routes
+        Route::prefix('reports')->group(function () {
+            Route::post('itc04',            'Report\GstItc04Controller@getReport');
+            Route::post('itc04/export-csv', 'Report\GstItc04Controller@exportCsv');
+        });
+
         // Subscription Routes
         Route::prefix('subscriptions')->group(function () {
             Route::post('status',      'Subscription\SubscriptionController@status');

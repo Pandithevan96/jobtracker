@@ -19,6 +19,8 @@ import ReconciliationsList from '@/pages/Reconciliations/ReconciliationsList';
 import ReconciliationDetail from '@/pages/Reconciliations/ReconciliationDetail';
 import VendorsList from '@/pages/Vendors/VendorsList';
 import VendorDetail from '@/pages/Vendors/VendorDetail';
+import InvoicesList from '@/pages/Invoices/InvoicesList';
+import Itc04ReportPage from '@/pages/Reports/Itc04ReportPage';
 import NotificationsPage from '@/pages/Notifications/NotificationsPage';
 import WorkspaceSettingsPage from '@/pages/Workspace/WorkspaceSettingsPage';
 import ProfilePage from '@/pages/Profile/ProfilePage';
@@ -95,6 +97,14 @@ function Router() {
             {
               path: '/vendors/:id',
               element: <VendorDetail />,
+            },
+            {
+              path: '/invoices',
+              element: <InvoicesList />,
+            },
+            {
+              path: '/reports/itc04',
+              element: <Itc04ReportPage />,
             },
             {
               path: '/notifications',
