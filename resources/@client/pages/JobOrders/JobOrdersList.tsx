@@ -17,6 +17,9 @@ import {
   AlertTriangle,
   UserPlus,
   LayoutGrid,
+  Sparkles,
+  UploadCloud,
+  CheckCircle2,
 } from 'lucide-react';
 
 export interface JobOrder {
@@ -80,6 +83,55 @@ export const JobOrdersList: React.FC = () => {
   const [vendors, setVendors] = useState<any[]>([]);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [extractingDrawing, setExtractingDrawing] = useState(false);
+  const [extractionSuccess, setExtractionSuccess] = useState<string | null>(null);
+  const drawingInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDrawingUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setExtractingDrawing(true);
+    setExtractionSuccess(null);
+    setCreateError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('drawing', file);
+
+      const workspaceId = await getCurrentWorkspaceId();
+      if (workspaceId) formData.append('workspace_id', String(workspaceId));
+
+      const res = await apiClient.post('/job-orders/extract-drawing-specs', formData);
+      const data = res.data?.data || res.data;
+      const specs = data?.extracted_specs;
+
+      if (specs) {
+        if (specs.part_name) {
+          setNewOrder((prev) => ({
+            ...prev,
+            part_name: specs.part_name,
+            part_number: specs.part_number || prev.part_number,
+            quantity_sent: specs.quantity || prev.quantity_sent,
+            notes: [prev.notes, specs.notes, specs.tolerances ? `Tolerances: ${specs.tolerances}` : '']
+              .filter(Boolean)
+              .join(' | '),
+          }));
+        }
+
+        if (specs.process_type) {
+          setSelectedProcesses([specs.process_type]);
+        }
+
+        setExtractionSuccess(`Extracted: ${specs.part_name} (${specs.process_type || 'Machining'})`);
+      }
+    } catch (err: any) {
+      console.error('Drawing extraction failed', err);
+      setCreateError(err?.response?.data?.message || 'Failed to extract specs from drawing');
+    } finally {
+      setExtractingDrawing(false);
+    }
+  };
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
@@ -573,6 +625,50 @@ export const JobOrdersList: React.FC = () => {
 
             <h2 className="text-lg font-bold text-white mb-1">Create Job Order</h2>
             <p className="text-xs text-[#888] mb-4">Issue a new subcontract job order to a vendor</p>
+
+            {/* AI Drawing Spec Auto-Extraction Box */}
+            <div className="mb-4 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/30 rounded-xl p-3.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                  <Sparkles size={14} className="animate-pulse text-amber-400" />
+                  AI Spec Auto-Extraction
+                </span>
+                <span className="text-[10px] text-[#888]">Cuts data-entry time</span>
+              </div>
+              <p className="text-[11px] text-[#aaa]">
+                Upload a CAD blueprint PDF or drawing image. AI auto-extracts Part Name, Part #, Process & Material to pre-fill fields.
+              </p>
+
+              <input
+                type="file"
+                ref={drawingInputRef}
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                onChange={handleDrawingUpload}
+                className="hidden"
+              />
+
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => drawingInputRef.current?.click()}
+                  disabled={extractingDrawing}
+                  className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {extractingDrawing ? (
+                    <Loader2 size={13} className="animate-spin text-amber-400" />
+                  ) : (
+                    <UploadCloud size={13} className="text-amber-400" />
+                  )}
+                  {extractingDrawing ? 'Extracting Specs...' : 'Upload Engineering Drawing'}
+                </button>
+
+                {extractionSuccess && (
+                  <span className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
+                    <CheckCircle2 size={12} /> {extractionSuccess}
+                  </span>
+                )}
+              </div>
+            </div>
 
             {createError && (
               <div className="mb-4 flex items-start gap-2 text-xs text-red-300 bg-rose-500/10 border border-rose-500/30 rounded-xl px-3 py-2.5">
