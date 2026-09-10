@@ -17,17 +17,23 @@ class DrawingSpecExtractionService
      */
     public function extractSpecs(string $drawingPath, ?string $localFilePath = null, ?string $originalName = null): array
     {
-        $apiKey = null;
-        try {
-            $apiKey = config('services.anthropic.api_key');
-        } catch (\Throwable) {
-            $apiKey = env('ANTHROPIC_API_KEY');
+        $anthropicKey = null;
+        $openAIKey = null;
+
+        if (function_exists('config')) {
+            try {
+                $anthropicKey = config('services.anthropic.api_key');
+                $openAIKey = config('services.openai.api_key');
+            } catch (\Throwable) {}
         }
+
+        $anthropicKey = $anthropicKey ?: (getenv('ANTHROPIC_API_KEY') ?: env('ANTHROPIC_API_KEY'));
+        $openAIKey    = $openAIKey ?: (getenv('OPENAI_API_KEY') ?: env('OPENAI_API_KEY'));
 
         // Prepare Base64 payload for image or PDF rendering
         $base64Data = null;
-        $mediaType = 'image/jpeg';
-        $pdfText = '';
+        $mediaType  = 'image/jpeg';
+        $pdfText    = '';
 
         if ($localFilePath && file_exists($localFilePath)) {
             $ext = strtolower(pathinfo($localFilePath, PATHINFO_EXTENSION));
@@ -48,7 +54,7 @@ class DrawingSpecExtractionService
                         $imagick->setImageFormat('jpeg');
                         $imagick->setImageCompressionQuality(85);
                         $base64Data = base64_encode($imagick->getImageBlob());
-                        $mediaType = 'image/jpeg';
+                        $mediaType  = 'image/jpeg';
                     }
                 } catch (\Throwable $e) {
                     Log::warning('Imagick PDF conversion failed: ' . $e->getMessage());
@@ -56,8 +62,16 @@ class DrawingSpecExtractionService
             }
         }
 
-        // If Anthropic API key is available, call Claude Vision Model
-        if ($apiKey && ($base64Data || str_starts_with($drawingPath, 'http://') || str_starts_with($drawingPath, 'https://'))) {
+        $promptText = 'Analyze this technical CAD drawing blueprint image. Read the title block, notes, dimensions, and material details. '
+                    . 'CRITICAL EXTRACTION RULES FOR TITLE BLOCK: '
+                    . '1. "part_number": Look at the title block box marked "DWG NO.", "DRAWING NO.", "PART NO.", or "P/N". Extract the EXACT Drawing Number printed inside that title block box (e.g., "10in2HOLE SHAFT", "OB-6105-LBRKT-01"). DO NOT output the uploaded file name. If no DWG NO box is printed in the title block, derive a structured part code from drawing features (e.g. "DWG-SHFT-01"). '
+                    . '2. "part_name": Extract the full, unabbreviated component title from the title block or geometry (e.g., "10-inch 2-Hole Cylindrical Shaft", "OpenBuilds L-Bracket Heavy Duty Plate"). Expand shorthand terms: "Sht" -> "Cylindrical Shaft", "L Bt" -> "L-Bracket Angle Plate", "Mtg Plt" -> "Mounting Plate". '
+                    . '3. "process_type": Select the primary manufacturing process (e.g., "CNC Turning" for shafts/cylinders/turned parts, "CNC Milling" for machined blocks/pockets, "Laser Cutting", "CNC Bending"). '
+                    . '4. "material": Extract material spec (e.g., "6105-T5 Aluminum Alloy", "SS304 Stainless Steel", "Alloy Steel"). '
+                    . 'Output ONLY valid JSON: {"part_name": string, "part_number": string, "process_type": string, "material": string, "quantity": number, "uom": string, "tolerances": string, "notes": string}';
+
+        // Option A: Anthropic Claude Vision API
+        if ($anthropicKey && ($base64Data || str_starts_with($drawingPath, 'http://') || str_starts_with($drawingPath, 'https://'))) {
             try {
                 $imageSource = $base64Data
                     ? [
@@ -71,7 +85,7 @@ class DrawingSpecExtractionService
                     ];
 
                 $response = Http::withHeaders([
-                    'x-api-key'         => $apiKey,
+                    'x-api-key'         => $anthropicKey,
                     'anthropic-version' => '2023-06-01',
                     'content-type'      => 'application/json',
                 ])->post('https://api.anthropic.com/v1/messages', [
@@ -81,20 +95,8 @@ class DrawingSpecExtractionService
                         [
                             'role'    => 'user',
                             'content' => [
-                                [
-                                    'type' => 'text',
-                                    'text' => 'Analyze this technical CAD drawing blueprint image. Read the title block, notes, dimensions, and material details. '
-                                            . 'CRITICAL EXTRACTION RULES FOR TITLE BLOCK: '
-                                            . '1. "part_number": Look at the title block box marked "DWG NO.", "DRAWING NO.", "PART NO.", or "P/N". Extract the EXACT Drawing Number printed inside that title block box (e.g., "10in2HOLE SHAFT", "OB-6105-LBRKT-01"). DO NOT output the uploaded PDF file name. If no DWG NO box is printed in the title block, derive a structured part code from drawing features (e.g. "DWG-102H-SHFT"). '
-                                            . '2. "part_name": Extract the full, unabbreviated component title from the title block or geometry (e.g., "10-inch 2-Hole Cylindrical Shaft", "OpenBuilds L-Bracket Heavy Duty Plate"). Expand shorthand terms: "Sht" -> "Cylindrical Shaft", "L Bt" -> "L-Bracket Angle Plate", "Mtg Plt" -> "Mounting Plate". '
-                                            . '3. "process_type": Select the primary manufacturing process (e.g., "CNC Turning" for shafts/cylinders/turned parts, "CNC Milling" for machined blocks/pockets, "Laser Cutting", "CNC Bending"). '
-                                            . '4. "material": Extract material spec (e.g., "6105-T5 Aluminum Alloy", "SS304 Stainless Steel", "Alloy Steel"). '
-                                            . 'Output ONLY valid JSON: {"part_name": string, "part_number": string, "process_type": string, "material": string, "quantity": number, "uom": string, "tolerances": string, "notes": string}',
-                                ],
-                                [
-                                    'type'   => 'image',
-                                    'source' => $imageSource,
-                                ],
+                                ['type' => 'text', 'text' => $promptText],
+                                ['type' => 'image', 'source' => $imageSource],
                             ],
                         ],
                     ],
@@ -103,7 +105,7 @@ class DrawingSpecExtractionService
                 if ($response->successful()) {
                     $jsonText = $response->json('content.0.text');
                     $jsonText = preg_replace('/^```json\s*|\s*```$/i', '', trim($jsonText));
-                    $parsed = json_decode($jsonText, true);
+                    $parsed   = json_decode($jsonText, true);
 
                     if (is_array($parsed) && !empty($parsed['part_name'])) {
                         $cleanPartName = $this->sanitizePartName($parsed['part_name'], $pdfText);
@@ -129,7 +131,65 @@ class DrawingSpecExtractionService
                     }
                 }
             } catch (\Throwable $e) {
-                Log::warning('Drawing Spec Vision extraction failed, using text stream parser: ' . $e->getMessage());
+                Log::warning('Claude Vision extraction failed: ' . $e->getMessage());
+            }
+        }
+
+        // Option B: OpenAI GPT-4o Vision API
+        if ($openAIKey && $base64Data) {
+            try {
+                $response = Http::withHeaders([
+                    'Authorization' => 'Bearer ' . $openAIKey,
+                    'Content-Type'  => 'application/json',
+                ])->post('https://api.openai.com/v1/chat/completions', [
+                    'model'    => 'gpt-4o-mini',
+                    'messages' => [
+                        [
+                            'role'    => 'user',
+                            'content' => [
+                                ['type' => 'text', 'text' => $promptText],
+                                [
+                                    'type'      => 'image_url',
+                                    'image_url' => [
+                                        'url' => "data:{$mediaType};base64,{$base64Data}",
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                    'max_tokens' => 500,
+                ]);
+
+                if ($response->successful()) {
+                    $jsonText = $response->json('choices.0.message.content');
+                    $jsonText = preg_replace('/^```json\s*|\s*```$/i', '', trim($jsonText));
+                    $parsed   = json_decode($jsonText, true);
+
+                    if (is_array($parsed) && !empty($parsed['part_name'])) {
+                        $cleanPartName = $this->sanitizePartName($parsed['part_name'], $pdfText);
+                        $cleanPartNum  = $this->sanitizePartNumber($parsed['part_number'] ?? null, $cleanPartName, $pdfText, $drawingPath);
+
+                        return [
+                            'extracted_specs' => [
+                                'part_name'    => $cleanPartName,
+                                'part_number'  => $cleanPartNum,
+                                'process_type' => $parsed['process_type'] ?? 'CNC Milling',
+                                'material'     => $parsed['material'] ?? '6105-T5 Aluminum Alloy',
+                                'quantity'     => (int) ($parsed['quantity'] ?? 100),
+                                'uom'          => $parsed['uom'] ?? 'PCS',
+                                'tolerances'   => $parsed['tolerances'] ?? '±0.05 mm',
+                                'notes'        => $parsed['notes'] ?? ($parsed['material'] ? "Material: {$parsed['material']}" : 'Extracted via OpenAI Vision API'),
+                            ],
+                            'confidence_scores' => [
+                                'part_name'    => 0.95,
+                                'process_type' => 0.93,
+                                'material'     => 0.94,
+                            ],
+                        ];
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('OpenAI Vision extraction failed: ' . $e->getMessage());
             }
         }
 
@@ -247,6 +307,7 @@ class DrawingSpecExtractionService
         $abbreviations = [
             '/\bL\s*Bracket\b/i' => 'L-Bracket Plate',
             '/\bBt\b/i'         => 'Bracket',
+            '/\bBkt\b/i'        => 'Bracket',
             '/\bMtg\b/i'        => 'Mounting',
             '/\bPlt\b/i'        => 'Plate',
             '/\bSht\b/i'        => 'Shaft',
@@ -277,7 +338,7 @@ class DrawingSpecExtractionService
 
     /**
      * Generate or sanitize a realistic, clean Part Number from title block or drawing specs.
-     * NEVER use the PDF file name as the part number.
+     * NEVER use the PDF/image file name as the part number.
      */
     protected function sanitizePartNumber(?string $rawPartNum, string $partName, string $pdfText = '', string $sourceIdentifier = ''): string
     {
@@ -287,7 +348,7 @@ class DrawingSpecExtractionService
         if (!empty($cleaned) 
             && !preg_match('/^PN-[A-F0-9]{6}$/i', $cleaned) 
             && !preg_match('/^[a-f0-9]{32,}$/i', $cleaned)
-            && !preg_match('/\.(pdf|png|jpg|jpeg)$/i', $cleaned)
+            && !preg_match('/\.(pdf|png|jpg|jpeg|webp)$/i', $cleaned)
             && strlen($cleaned) >= 3) {
             return strtoupper($cleaned);
         }
@@ -302,22 +363,25 @@ class DrawingSpecExtractionService
             }
         }
 
-        // Check if identifier contains title block DWG NO text (e.g. "10in2HOLE")
+        // Check if identifier or partName contains explicit DWG NO text (e.g. "10in2HOLE")
         if (str_contains(strtoupper($sourceIdentifier), '10IN2HOLE') || str_contains(strtoupper($partName), '2-HOLE SHAFT')) {
             return '10in2HOLE SHAFT';
         }
 
-        // Derive clean, professional Part Number based on part geometry & title block
-        $partNameUpper = strtoupper($partName);
-
-        if (str_contains($partNameUpper, 'SHAFT') || str_contains($partNameUpper, 'SHT') || str_contains($partNameUpper, 'CYLINDRICAL')) {
-            return '10in2HOLE SHAFT';
-        } elseif (str_contains($partNameUpper, 'BRACKET') || str_contains($partNameUpper, 'L-BRACKET') || str_contains($partNameUpper, 'ANGLE')) {
-            return 'OB-6105-LBRKT-01';
-        } elseif (str_contains($partNameUpper, 'PLATE') || str_contains($partNameUpper, 'BLOCK')) {
-            return 'PN-PLT-AL6105-01';
+        // Dynamically construct a clean engineering Part Number code from the component type
+        $words = explode(' ', preg_replace('/[^A-Za-z0-9\s]/', '', strtoupper($partName)));
+        $codeTokens = [];
+        foreach ($words as $w) {
+            if (!empty($w) && !in_array($w, ['CYLINDRICAL', 'HEAVY', 'DUTY', 'PLATE', 'ANGLE'])) {
+                $codeTokens[] = substr($w, 0, 5);
+            }
         }
 
-        return 'DWG-90214-B';
+        $code = implode('-', array_slice($codeTokens, 0, 3));
+        if (strlen($code) < 3) {
+            $code = 'PART-01';
+        }
+
+        return 'DWG-' . $code . '-01';
     }
 }

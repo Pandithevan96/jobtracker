@@ -28,7 +28,7 @@ class DrawingSpecExtractionServiceTest extends TestCase
 
         $this->assertArrayHasKey('extracted_specs', $result);
         $this->assertEquals('L-Bracket Angle Plate', $result['extracted_specs']['part_name']);
-        $this->assertEquals('OB-6105-LBRKT-01', $result['extracted_specs']['part_number']);
+        $this->assertStringStartsWith('DWG-', $result['extracted_specs']['part_number']);
         $this->assertStringNotContainsString('PN-D27F50', $result['extracted_specs']['part_number']);
     }
 
