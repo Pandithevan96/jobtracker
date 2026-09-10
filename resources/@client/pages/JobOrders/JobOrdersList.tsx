@@ -59,7 +59,7 @@ export const JobOrdersList: React.FC = () => {
     vendor_id: '',
     part_name: '',
     part_number: '',
-    process_type: 'CNC Machining',
+    process_type: 'CNC Milling',
     custom_process_type: '',
     quantity_sent: 100,
     due_date: getTodayDate(),
@@ -300,7 +300,7 @@ export const JobOrdersList: React.FC = () => {
         vendor_id: vendors.length > 0 ? String(vendors[0].id) : '',
         part_name: '',
         part_number: '',
-        process_type: 'CNC Machining',
+        process_type: 'CNC Milling',
         custom_process_type: '',
         quantity_sent: 100,
         due_date: getTodayDate(),
@@ -650,53 +650,82 @@ export const JobOrdersList: React.FC = () => {
                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-white px-3 py-2.5 focus:outline-none focus:border-[#f5a623]"
                   >
                     <optgroup label="CNC & Precision Machining">
-                      <option value="CNC Machining">CNC Milling / VMC</option>
-                      <option value="CNC Turning">CNC Turning / Lathe</option>
-                      <option value="5-Axis Machining">5-Axis CNC Machining</option>
-                      <option value="HMC Machining">HMC Horizontal Machining</option>
-                      <option value="Wire EDM">Wire EDM / Spark Erosion</option>
-                      <option value="Jig Boring">Jig Boring & Slotting</option>
+                      <option value="CNC Milling">CNC Milling</option>
+                      <option value="VMC Machining">VMC Machining</option>
+                      <option value="CNC Turning">CNC Turning</option>
+                      <option value="Lathe Machining">Lathe Machining</option>
+                      <option value="5-Axis CNC Machining">5-Axis CNC Machining</option>
+                      <option value="HMC Horizontal Machining">HMC Horizontal Machining</option>
+                      <option value="Wire EDM">Wire EDM</option>
+                      <option value="Spark Erosion">Spark Erosion</option>
+                      <option value="Jig Boring">Jig Boring</option>
+                      <option value="Slotting">Slotting</option>
                     </optgroup>
                     <optgroup label="Forming & Sheet Metal">
-                      <option value="Laser Cutting & Bending">Laser Cutting & CNC Bending</option>
-                      <option value="Sheet Metal Stamping">Sheet Metal Stamping & Press Work</option>
-                      <option value="Hot/Cold Forging">Hot / Cold Forging</option>
-                      <option value="Deep Drawing">Deep Drawing & Blanking</option>
+                      <option value="Laser Cutting">Laser Cutting</option>
+                      <option value="CNC Bending">CNC Bending</option>
+                      <option value="Sheet Metal Stamping">Sheet Metal Stamping</option>
+                      <option value="Press Work">Press Work</option>
+                      <option value="Hot Forging">Hot Forging</option>
+                      <option value="Cold Forging">Cold Forging</option>
+                      <option value="Deep Drawing">Deep Drawing</option>
+                      <option value="Blanking">Blanking</option>
                     </optgroup>
                     <optgroup label="Casting & Foundry">
-                      <option value="Sand Casting">Sand / Shell Moulding Casting</option>
-                      <option value="Investment Casting">Investment / Die Casting (HPDC/LPDC)</option>
-                      <option value="Fettling & Shot Blasting">Fettling & Shot Blasting</option>
+                      <option value="Sand Casting">Sand Casting</option>
+                      <option value="Shell Moulding Casting">Shell Moulding Casting</option>
+                      <option value="Investment Casting">Investment Casting</option>
+                      <option value="High Pressure Die Casting (HPDC)">High Pressure Die Casting (HPDC)</option>
+                      <option value="Low Pressure Die Casting (LPDC)">Low Pressure Die Casting (LPDC)</option>
+                      <option value="Fettling">Fettling</option>
+                      <option value="Shot Blasting">Shot Blasting</option>
                     </optgroup>
                     <optgroup label="Heat Treatment">
-                      <option value="Case Hardening">Case Hardening / Carburizing</option>
+                      <option value="Case Hardening">Case Hardening</option>
+                      <option value="Carburizing">Carburizing</option>
                       <option value="Induction Hardening">Induction Hardening</option>
-                      <option value="Nitriding">Gas / Ion Nitriding</option>
-                      <option value="Annealing & Tempering">Annealing, Quenching & Tempering</option>
+                      <option value="Gas Nitriding">Gas Nitriding</option>
+                      <option value="Ion Nitriding">Ion Nitriding</option>
+                      <option value="Annealing">Annealing</option>
+                      <option value="Quenching">Quenching</option>
+                      <option value="Tempering">Tempering</option>
                       <option value="Vacuum Heat Treatment">Vacuum Heat Treatment</option>
                     </optgroup>
                     <optgroup label="Surface Treatment & Plating">
-                      <option value="Anodizing / Coating">Anodizing / Hard Anodizing</option>
-                      <option value="Electroplating">Zinc / Chrome / Nickel Plating</option>
-                      <option value="Powder Coating">Powder Coating & Industrial Painting</option>
-                      <option value="Phosphating">Phosphating & Blackodising</option>
-                      <option value="CED Coating">CED / E-Coating</option>
+                      <option value="Anodizing">Anodizing</option>
+                      <option value="Hard Anodizing">Hard Anodizing</option>
+                      <option value="Zinc Plating">Zinc Plating</option>
+                      <option value="Chrome Plating">Chrome Plating</option>
+                      <option value="Nickel Plating">Nickel Plating</option>
+                      <option value="Powder Coating">Powder Coating</option>
+                      <option value="Industrial Painting">Industrial Painting</option>
+                      <option value="Phosphating">Phosphating</option>
+                      <option value="Blackodising">Blackodising</option>
+                      <option value="CED / E-Coating">CED / E-Coating</option>
                     </optgroup>
                     <optgroup label="Grinding & Honing">
-                      <option value="Cylindrical Grinding">Cylindrical & Centerless Grinding</option>
-                      <option value="Surface Grinding">Precision Surface Grinding</option>
-                      <option value="Honing">Cylinder Honing</option>
-                      <option value="Gear Hobbing">Gear Hobbing & Gear Grinding</option>
+                      <option value="Cylindrical Grinding">Cylindrical Grinding</option>
+                      <option value="Centerless Grinding">Centerless Grinding</option>
+                      <option value="Precision Surface Grinding">Precision Surface Grinding</option>
+                      <option value="Cylinder Honing">Cylinder Honing</option>
+                      <option value="Gear Hobbing">Gear Hobbing</option>
+                      <option value="Gear Grinding">Gear Grinding</option>
                     </optgroup>
                     <optgroup label="Welding & Fabrication">
-                      <option value="MIG/TIG Welding">MIG / TIG / Laser Welding</option>
-                      <option value="Structural Fabrication">Heavy Structural Fabrication</option>
-                      <option value="Robotic Welding">Robotic & Spot Welding</option>
+                      <option value="MIG Welding">MIG Welding</option>
+                      <option value="TIG Welding">TIG Welding</option>
+                      <option value="Laser Welding">Laser Welding</option>
+                      <option value="Heavy Structural Fabrication">Heavy Structural Fabrication</option>
+                      <option value="Robotic Welding">Robotic Welding</option>
+                      <option value="Spot Welding">Spot Welding</option>
                     </optgroup>
                     <optgroup label="Inspection & Assembly">
-                      <option value="CMM & NDT Inspection">CMM Inspection & NDT Testing</option>
-                      <option value="Dynamic Balancing">Dynamic Balancing & Hydrostatic Test</option>
-                      <option value="Sub-Assembly">Sub-Assembly & Wiring</option>
+                      <option value="CMM Inspection">CMM Inspection</option>
+                      <option value="NDT Testing">NDT Testing</option>
+                      <option value="Dynamic Balancing">Dynamic Balancing</option>
+                      <option value="Hydrostatic Testing">Hydrostatic Testing</option>
+                      <option value="Sub-Assembly">Sub-Assembly</option>
+                      <option value="Wiring & Harnessing">Wiring & Harnessing</option>
                     </optgroup>
                     <optgroup label="Custom / Special">
                       <option value="Other">Other / Custom Process...</option>
