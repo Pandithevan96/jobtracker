@@ -110,17 +110,20 @@ class DrawingSpecExtractionService
                     if (is_array($parsed) && !empty($parsed['part_name'])) {
                         $cleanPartName = $this->sanitizePartName($parsed['part_name'], $pdfText);
                         $cleanPartNum  = $this->sanitizePartNumber($parsed['part_number'] ?? null, $cleanPartName, $pdfText, $drawingPath);
+                        $material      = !empty($parsed['material']) ? trim($parsed['material']) : 'Specified on Drawing';
+                        $tolerances    = !empty($parsed['tolerances']) ? trim($parsed['tolerances']) : null;
+                        $notes         = !empty($parsed['notes']) ? trim($parsed['notes']) : "Material: {$material}";
 
                         return [
                             'extracted_specs' => [
                                 'part_name'    => $cleanPartName,
                                 'part_number'  => $cleanPartNum,
                                 'process_type' => $parsed['process_type'] ?? 'CNC Milling',
-                                'material'     => $parsed['material'] ?? '6105-T5 Aluminum Alloy',
+                                'material'     => $material,
                                 'quantity'     => (int) ($parsed['quantity'] ?? 100),
                                 'uom'          => $parsed['uom'] ?? 'PCS',
-                                'tolerances'   => $parsed['tolerances'] ?? '±0.05 mm',
-                                'notes'        => $parsed['notes'] ?? ($parsed['material'] ? "Material: {$parsed['material']}" : 'Extracted via Claude Vision API'),
+                                'tolerances'   => $tolerances,
+                                'notes'        => $notes,
                             ],
                             'confidence_scores' => [
                                 'part_name'    => 0.96,
@@ -168,17 +171,20 @@ class DrawingSpecExtractionService
                     if (is_array($parsed) && !empty($parsed['part_name'])) {
                         $cleanPartName = $this->sanitizePartName($parsed['part_name'], $pdfText);
                         $cleanPartNum  = $this->sanitizePartNumber($parsed['part_number'] ?? null, $cleanPartName, $pdfText, $drawingPath);
+                        $material      = !empty($parsed['material']) ? trim($parsed['material']) : 'Specified on Drawing';
+                        $tolerances    = !empty($parsed['tolerances']) ? trim($parsed['tolerances']) : null;
+                        $notes         = !empty($parsed['notes']) ? trim($parsed['notes']) : "Material: {$material}";
 
                         return [
                             'extracted_specs' => [
                                 'part_name'    => $cleanPartName,
                                 'part_number'  => $cleanPartNum,
                                 'process_type' => $parsed['process_type'] ?? 'CNC Milling',
-                                'material'     => $parsed['material'] ?? '6105-T5 Aluminum Alloy',
+                                'material'     => $material,
                                 'quantity'     => (int) ($parsed['quantity'] ?? 100),
                                 'uom'          => $parsed['uom'] ?? 'PCS',
-                                'tolerances'   => $parsed['tolerances'] ?? '±0.05 mm',
-                                'notes'        => $parsed['notes'] ?? ($parsed['material'] ? "Material: {$parsed['material']}" : 'Extracted via OpenAI Vision API'),
+                                'tolerances'   => $tolerances,
+                                'notes'        => $notes,
                             ],
                             'confidence_scores' => [
                                 'part_name'    => 0.95,
@@ -211,19 +217,38 @@ class DrawingSpecExtractionService
             $processType = 'Laser Cutting';
         }
 
-        $material = '6105-T5 Aluminum Alloy';
+        $material = 'Specified on Drawing';
         if (str_contains($combinedContext, 'SS') || str_contains($combinedContext, '304') || str_contains($combinedContext, '316')) {
             $material = 'Stainless Steel (SS304/316)';
         } elseif (str_contains($combinedContext, 'AL6061') || str_contains($combinedContext, '6061')) {
             $material = 'Aluminum 6061';
-        } elseif (str_contains($combinedContext, '6105') || str_contains($combinedContext, 'AL')) {
+        } elseif (str_contains($combinedContext, '6105')) {
             $material = '6105-T5 Aluminum Alloy';
-        } elseif (str_contains($combinedContext, 'STEEL')) {
+        } elseif (str_contains($combinedContext, 'STEEL') || str_contains($combinedContext, '4140')) {
             $material = 'Alloy Steel';
+        } elseif (str_contains($combinedContext, 'BRASS')) {
+            $material = 'Brass';
+        }
+
+        $surfaceFinish = null;
+        if (str_contains($combinedContext, 'ANODIZE')) {
+            $surfaceFinish = 'Clear Anodized';
+        } elseif (str_contains($combinedContext, 'BLACK OXIDE')) {
+            $surfaceFinish = 'Black Oxide';
+        }
+
+        $tolerances = null;
+        if (preg_match('/±\s*[\d\.]+\s*(?:mm|in)?/i', $combinedContext, $tolMatch)) {
+            $tolerances = $tolMatch[0];
         }
 
         $cleanPartName = $this->sanitizePartName($basename, $pdfText);
         $cleanPartNum  = $this->sanitizePartNumber(null, $cleanPartName, $pdfText, $basename);
+
+        $noteParts = ["Material: {$material}"];
+        if ($surfaceFinish) {
+            $noteParts[] = "Surface: {$surfaceFinish}";
+        }
 
         return [
             'extracted_specs' => [
@@ -233,8 +258,8 @@ class DrawingSpecExtractionService
                 'material'     => $material,
                 'quantity'     => 100,
                 'uom'          => 'PCS',
-                'tolerances'   => '±0.05 mm',
-                'notes'        => "Material: {$material} | Surface: Clear Anodize | Auto-extracted from drawing title block",
+                'tolerances'   => $tolerances,
+                'notes'        => implode(' | ', $noteParts),
             ],
             'confidence_scores' => [
                 'part_name'    => 0.90,

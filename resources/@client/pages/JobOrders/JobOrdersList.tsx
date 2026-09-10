@@ -113,9 +113,17 @@ export const JobOrdersList: React.FC = () => {
             part_name: specs.part_name,
             part_number: specs.part_number || prev.part_number,
             quantity_sent: specs.quantity || prev.quantity_sent,
-            notes: [prev.notes, specs.notes, specs.tolerances ? `Tolerances: ${specs.tolerances}` : '']
-              .filter(Boolean)
-              .join(' | '),
+            notes: Array.from(
+              new Set(
+                [
+                  prev.notes,
+                  specs.notes,
+                  specs.tolerances && !specs.notes?.includes('Tolerance') ? `Tolerances: ${specs.tolerances}` : '',
+                ]
+                  .filter(Boolean)
+                  .flatMap((n) => n.split(' | '))
+              )
+            ).join(' | '),
           }));
         }
 
