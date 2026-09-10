@@ -18,4 +18,17 @@ class DrawingSpecExtractionServiceTest extends TestCase
         $this->assertEquals('CNC Turning', $result['extracted_specs']['process_type']);
         $this->assertEquals('Aluminum 6061', $result['extracted_specs']['material']);
     }
+
+    public function test_l_bt_shorthand_part_name_expansion_and_clean_part_number()
+    {
+        $service = new DrawingSpecExtractionService();
+        $path = 'uploads/L_Bt.pdf';
+
+        $result = $service->extractSpecs($path);
+
+        $this->assertArrayHasKey('extracted_specs', $result);
+        $this->assertEquals('L-Bracket Angle Plate', $result['extracted_specs']['part_name']);
+        $this->assertEquals('OB-6105-LBRKT-01', $result['extracted_specs']['part_number']);
+        $this->assertStringNotContainsString('PN-D27F50', $result['extracted_specs']['part_number']);
+    }
 }
