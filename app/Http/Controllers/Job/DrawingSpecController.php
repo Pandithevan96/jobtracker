@@ -59,9 +59,13 @@ class DrawingSpecController extends Controller
             }
 
             $filePath = $request->input('drawing_path');
+            $originalName = null;
+            $localFilePath = null;
 
             if ($request->hasFile('drawing')) {
                 $file = $request->file('drawing');
+                $originalName = $file->getClientOriginalName();
+                $localFilePath = $file->getRealPath();
                 $storedPath = $file->store('drawings', 'public');
                 $filePath = asset('storage/' . $storedPath);
             }
@@ -70,7 +74,7 @@ class DrawingSpecController extends Controller
                 return HelperFunction::response(null, null, 'Drawing file or path is required for extraction', 'error', '001', Response::HTTP_BAD_REQUEST);
             }
 
-            $extracted = $this->extractionService->extractSpecs($filePath);
+            $extracted = $this->extractionService->extractSpecs($filePath, $localFilePath, $originalName);
 
             $record = DrawingExtractedSpec::create([
                 'workspace_id'      => $workspace->id,
