@@ -17,6 +17,7 @@ import RejectionsList from '@/pages/Rejections/RejectionsList';
 import RejectionDetail from '@/pages/Rejections/RejectionDetail';
 import ReconciliationsList from '@/pages/Reconciliations/ReconciliationsList';
 import ReconciliationDetail from '@/pages/Reconciliations/ReconciliationDetail';
+import MaterialAnomaliesList from '@/pages/Reconciliations/MaterialAnomaliesList';
 import VendorsList from '@/pages/Vendors/VendorsList';
 import VendorDetail from '@/pages/Vendors/VendorDetail';
 import InvoicesList from '@/pages/Invoices/InvoicesList';
@@ -89,6 +90,10 @@ function Router() {
             {
               path: '/reconciliations/:id',
               element: <ReconciliationDetail />,
+            },
+            {
+              path: '/material-anomalies',
+              element: <MaterialAnomaliesList />,
             },
             {
               path: '/vendors',

@@ -60,11 +60,13 @@ Route::prefix('v1')->group(function () {
 
         // Vendor Routes
         Route::prefix('vendors')->group(function () {
-            Route::post('create',      'Vendor\VendorController@store');
-            Route::post('list',        'Vendor\VendorController@list');
-            Route::post('details',     'Vendor\VendorController@details');
-            Route::post('update',      'Vendor\VendorController@update');
-            Route::post('link-user',   'Vendor\VendorController@linkUser');
+            Route::post('create',          'Vendor\VendorController@store');
+            Route::post('list',            'Vendor\VendorController@list');
+            Route::post('details',         'Vendor\VendorController@details');
+            Route::post('update',          'Vendor\VendorController@update');
+            Route::post('link-user',       'Vendor\VendorController@linkUser');
+            Route::get('recommendations',  'Vendor\VendorRecommendationController@index');
+            Route::post('recommendations', 'Vendor\VendorRecommendationController@index');
         });
 
         // Job Order Routes
@@ -74,8 +76,9 @@ Route::prefix('v1')->group(function () {
             Route::post('details',          'Job\JobOrderController@details');
             Route::post('update-status',    'Job\JobOrderController@updateStatus');
             Route::post('upload-document',  'Job\JobOrderController@uploadDocument');
-            Route::post('add-note',         'Job\JobOrderController@addNote');
-            Route::post('notes',            'Job\JobOrderController@getNotes');
+            Route::post('add-note',              'Job\JobOrderController@addNote');
+            Route::post('notes',                 'Job\JobOrderController@getNotes');
+            Route::post('extract-drawing-specs', 'Job\DrawingSpecController@extract');
         });
 
         Route::prefix('challans')->group(function () {
@@ -95,13 +98,33 @@ Route::prefix('v1')->group(function () {
             Route::post('details',     'Job\QualityRejectionController@details');
             Route::post('acknowledge', 'Job\QualityRejectionController@acknowledge');
             Route::post('close',       'Job\QualityRejectionController@close');
+            Route::post('classify',    'Job\QualityRejectionController@classify');
+            Route::post('confirm-ai',  'Job\QualityRejectionController@confirmAi');
         });
 
-        // Material Reconciliation Routes
+        // Material Reconciliation & Anomaly Routes
+        Route::get('job-orders/{id}/reconciliation', 'Job\MaterialAnomalyController@showJobReconciliation');
+        Route::post('job-orders/{id}/reconciliation', 'Job\MaterialAnomalyController@showJobReconciliation');
+
         Route::prefix('reconciliations')->group(function () {
             Route::post('create',      'Job\MaterialReconciliationController@store');
             Route::post('list',        'Job\MaterialReconciliationController@list');
             Route::post('details',     'Job\MaterialReconciliationController@details');
+        });
+
+        Route::prefix('material-anomalies')->group(function () {
+            Route::get('/',        'Job\MaterialAnomalyController@index');
+            Route::post('/',       'Job\MaterialAnomalyController@index');
+            Route::post('resolve', 'Job\MaterialAnomalyController@resolve');
+        });
+
+        // Delay Risk Routes
+        Route::get('job-orders/{id}/delay-risk', 'Job\DelayRiskController@showJobRisk');
+        Route::post('job-orders/{id}/delay-risk', 'Job\DelayRiskController@showJobRisk');
+
+        Route::prefix('delay-risks')->group(function () {
+            Route::get('/',  'Job\DelayRiskController@index');
+            Route::post('/', 'Job\DelayRiskController@index');
         });
 
         // Job Work Tax Invoice Routes

@@ -53,6 +53,10 @@ class QualityRejection extends Model
         'rejection_reason',
         'photo_path',
         'status',
+        'ai_defect_tags',
+        'ai_suggested_category',
+        'ai_confidence',
+        'ai_reviewed',
     ];
 
     /**
@@ -65,6 +69,9 @@ class QualityRejection extends Model
         'accepted_qty'   => 'decimal:2',
         'rejection_type' => 'integer',
         'status'         => 'integer',
+        'ai_defect_tags' => 'array',
+        'ai_confidence'  => 'float',
+        'ai_reviewed'    => 'boolean',
     ];
 
     // -------------------------------------------------------------------------

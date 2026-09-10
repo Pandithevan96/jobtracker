@@ -23,6 +23,8 @@ import {
 import apiClient from '@/services/apiClient';
 import { getEcho, destroyEcho } from '@/services/echoClient';
 import { useAuth } from '@/context/AuthContext';
+import MaterialReconciliationCard from '@/components/MaterialReconciliationCard';
+import DelayRiskBadge from '@/components/DelayRiskBadge';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -772,6 +774,7 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, onClose }) =>
             <span className={`border text-xs px-3 py-1 rounded-full font-bold uppercase ${statusColor}`}>
               {statusLabel}
             </span>
+            <DelayRiskBadge jobOrderId={order.id} showDetails={true} />
           </div>
           {appMode === 'vendor' ? (
             <p className="text-xs text-[#888] flex items-center gap-2 flex-wrap">
@@ -886,6 +889,9 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ file, onClose }) =>
           </div>
         </div>
       </div>
+
+      {/* Material Reconciliation & Loss Anomaly Card */}
+      <MaterialReconciliationCard jobOrderId={order.id} />
 
       {/* Specs & Notes */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

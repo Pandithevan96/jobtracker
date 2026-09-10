@@ -21,6 +21,7 @@ import {
     PackageCheck,
     IndianRupee,
     FileSpreadsheet,
+    ShieldAlert,
 } from "lucide-react";
 
 export const Layout: React.FC = () => {
@@ -160,6 +161,7 @@ export const Layout: React.FC = () => {
             principalOnly: false,
         },
         { name: "Reconciliations", path: "/reconciliations", icon: Scale, principalOnly: false },
+        { name: "Material Anomalies", path: "/material-anomalies", icon: ShieldAlert, principalOnly: false },
         { name: "Vendors", path: "/vendors", icon: Building2, principalOnly: true },
         { name: "Notifications", path: "/notifications", icon: Bell, count: notifCount, principalOnly: false },
         {

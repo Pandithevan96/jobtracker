@@ -86,6 +86,9 @@ class QualityRejectionController extends Controller
                 'status'           => QualityRejection::STATUS_OPEN,
             ]);
 
+            // Dispatch async AI classification job
+            \App\Jobs\ClassifyRejectionJob::dispatch($rejection->id);
+
             return HelperFunction::response($rejection, null, 'Quality Rejection reported successfully', 'success', '000', Response::HTTP_CREATED);
         } catch (Exception $e) {
             return HelperFunction::response(null, null, 'Failed to report quality rejection: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -316,6 +319,70 @@ class QualityRejectionController extends Controller
             return HelperFunction::response($rejection->fresh(), null, 'Quality Rejection closed successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
             return HelperFunction::response(null, null, 'Failed to close quality rejection: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Trigger immediate AI classification for a rejection.
+     * POST /api/v1/rejections/classify
+     */
+    public function classify(Request $request)
+    {
+        try {
+            $validation = Validator::make($request->all(), [
+                'id' => 'required|integer|exists:quality_rejections,id',
+            ]);
+
+            if ($validation->fails()) {
+                return HelperFunction::response(null, null, $validation->errors()->first(), 'error', '001', Response::HTTP_BAD_REQUEST);
+            }
+
+            $rejection = QualityRejection::find($request->input('id'));
+            $service = new \App\Services\RejectionClassificationService();
+            $result = $service->classify($rejection);
+
+            $rejection->update([
+                'ai_defect_tags'        => $result['ai_defect_tags'],
+                'ai_suggested_category' => $result['ai_suggested_category'],
+                'ai_confidence'         => $result['ai_confidence'],
+            ]);
+
+            return HelperFunction::response($rejection->fresh(), null, 'Rejection classified by AI successfully', 'success', '000', Response::HTTP_OK);
+        } catch (Exception $e) {
+            return HelperFunction::response(null, null, 'Failed to classify rejection: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Confirm / override AI suggested category.
+     * POST /api/v1/rejections/confirm-ai
+     */
+    public function confirmAi(Request $request)
+    {
+        try {
+            $validation = Validator::make($request->all(), [
+                'id'             => 'required|integer|exists:quality_rejections,id',
+                'rejection_type' => 'nullable|integer|in:1,2,3',
+            ]);
+
+            if ($validation->fails()) {
+                return HelperFunction::response(null, null, $validation->errors()->first(), 'error', '001', Response::HTTP_BAD_REQUEST);
+            }
+
+            $rejection = QualityRejection::find($request->input('id'));
+            $updateData = ['ai_reviewed' => true];
+
+            if ($request->filled('rejection_type')) {
+                $updateData['rejection_type'] = $request->input('rejection_type');
+            } elseif ($rejection->ai_suggested_category) {
+                $updateData['rejection_type'] = ($rejection->ai_suggested_category === 'scrap') ? QualityRejection::TYPE_SCRAP : QualityRejection::TYPE_REWORK;
+            }
+
+            $rejection->update($updateData);
+
+            return HelperFunction::response($rejection->fresh(), null, 'AI classification confirmed successfully', 'success', '000', Response::HTTP_OK);
+        } catch (Exception $e) {
+            return HelperFunction::response(null, null, 'Failed to confirm AI classification: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }
