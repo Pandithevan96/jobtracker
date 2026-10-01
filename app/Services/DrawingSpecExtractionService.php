@@ -208,7 +208,7 @@ class DrawingSpecExtractionService
             try {
                 $response = Http::withHeaders([
                     'Content-Type' => 'application/json',
-                ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={$geminiKey}", [
+                ])->post("https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={$geminiKey}", [
                     'contents' => [
                         [
                             'parts' => [
