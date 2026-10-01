@@ -65,8 +65,8 @@ class DrawingSpecController extends Controller
             if ($request->hasFile('drawing')) {
                 $file = $request->file('drawing');
                 $originalName = $file->getClientOriginalName();
-                $localFilePath = $file->getRealPath();
                 $storedPath = $file->store('drawings', 'public');
+                $localFilePath = storage_path('app/public/' . $storedPath);
                 $filePath = asset('storage/' . $storedPath);
             }
 
