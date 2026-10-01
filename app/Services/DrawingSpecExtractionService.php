@@ -39,7 +39,8 @@ class DrawingSpecExtractionService
         $pdfText    = '';
 
         if ($localFilePath && file_exists($localFilePath)) {
-            $ext = strtolower(pathinfo($localFilePath, PATHINFO_EXTENSION));
+            $extToUse = $originalName ? $originalName : $localFilePath;
+            $ext = strtolower(pathinfo($extToUse, PATHINFO_EXTENSION));
             if (in_array($ext, ['png', 'jpg', 'jpeg', 'webp'])) {
                 $mediaType = match ($ext) {
                     'png'  => 'image/png',
