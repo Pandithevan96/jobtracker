@@ -19,16 +19,19 @@ class DrawingSpecExtractionService
     {
         $anthropicKey = null;
         $openAIKey = null;
+        $geminiKey = null;
 
         if (function_exists('config')) {
             try {
                 $anthropicKey = config('services.anthropic.api_key');
                 $openAIKey = config('services.openai.api_key');
+                $geminiKey = config('services.gemini.api_key');
             } catch (\Throwable) {}
         }
 
         $anthropicKey = $anthropicKey ?: (getenv('ANTHROPIC_API_KEY') ?: env('ANTHROPIC_API_KEY'));
         $openAIKey    = $openAIKey ?: (getenv('OPENAI_API_KEY') ?: env('OPENAI_API_KEY'));
+        $geminiKey    = $geminiKey ?: (getenv('GEMINI_API_KEY') ?: env('GEMINI_API_KEY'));
 
         // Prepare Base64 payload for image or PDF rendering
         $base64Data = null;
@@ -196,6 +199,65 @@ class DrawingSpecExtractionService
                 }
             } catch (\Throwable $e) {
                 Log::warning('OpenAI Vision extraction failed: ' . $e->getMessage());
+            }
+        }
+
+        // Option C: Google Gemini Vision API (Generous Free Tier)
+        if ($geminiKey && $base64Data) {
+            try {
+                $response = Http::withHeaders([
+                    'Content-Type' => 'application/json',
+                ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={$geminiKey}", [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                ['text' => $promptText],
+                                [
+                                    'inline_data' => [
+                                        'mime_type' => $mediaType,
+                                        'data'      => $base64Data
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]);
+
+                if ($response->successful()) {
+                    $jsonText = $response->json('candidates.0.content.parts.0.text');
+                    if ($jsonText) {
+                        $jsonText = preg_replace('/^```json\s*|\s*```$/i', '', trim($jsonText));
+                        $parsed   = json_decode($jsonText, true);
+
+                        if (is_array($parsed) && !empty($parsed['part_name'])) {
+                            $cleanPartName = $this->sanitizePartName($parsed['part_name'], $pdfText);
+                            $cleanPartNum  = $this->sanitizePartNumber($parsed['part_number'] ?? null, $cleanPartName, $pdfText, $drawingPath);
+                            $material      = !empty($parsed['material']) ? trim($parsed['material']) : 'Specified on Drawing';
+                            $tolerances    = !empty($parsed['tolerances']) ? trim($parsed['tolerances']) : null;
+                            $notes         = !empty($parsed['notes']) ? trim($parsed['notes']) : "Material: {$material}";
+
+                            return [
+                                'extracted_specs' => [
+                                    'part_name'    => $cleanPartName,
+                                    'part_number'  => $cleanPartNum,
+                                    'process_type' => $parsed['process_type'] ?? 'CNC Milling',
+                                    'material'     => $material,
+                                    'quantity'     => (int) ($parsed['quantity'] ?? 100),
+                                    'uom'          => $parsed['uom'] ?? 'PCS',
+                                    'tolerances'   => $tolerances,
+                                    'notes'        => $notes,
+                                ],
+                                'confidence_scores' => [
+                                    'part_name'    => 0.95,
+                                    'process_type' => 0.93,
+                                    'material'     => 0.94,
+                                ],
+                            ];
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Gemini Vision extraction failed: ' . $e->getMessage());
             }
         }
 
