@@ -256,6 +256,22 @@ class DrawingSpecExtractionService
                             ];
                         }
                     }
+                } else {
+                    $errorBody = $response->body();
+                    Log::error('Gemini API Error: ' . $errorBody);
+                    return [
+                        'extracted_specs' => [
+                            'part_name'    => 'API_ERROR_CHECK_NOTES',
+                            'part_number'  => 'ERROR',
+                            'process_type' => 'Error',
+                            'material'     => 'Error',
+                            'quantity'     => 1,
+                            'uom'          => 'PCS',
+                            'tolerances'   => null,
+                            'notes'        => $errorBody,
+                        ],
+                        'confidence_scores' => []
+                    ];
                 }
             } catch (\Throwable $e) {
                 Log::warning('Gemini Vision extraction failed: ' . $e->getMessage());
