@@ -213,8 +213,8 @@ class DrawingSpecExtractionService
                             'parts' => [
                                 ['text' => $promptText],
                                 [
-                                    'inline_data' => [
-                                        'mime_type' => $mediaType,
+                                    'inlineData' => [
+                                        'mimeType' => $mediaType,
                                         'data'      => $base64Data
                                     ]
                                 ]
