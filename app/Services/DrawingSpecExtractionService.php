@@ -354,8 +354,8 @@ class DrawingSpecExtractionService
         // Fix casing for domain acronyms
         $name = str_replace(['L Bracket', 'L-bt', 'L Bt', 'Cnc', 'Vmc', 'Ss304', 'Ss316'], ['L-Bracket', 'L-Bracket', 'L-Bracket', 'CNC', 'VMC', 'SS304', 'SS316'], $name);
 
-        if (strlen($name) < 3 || strcasecmp($name, 'Sht') === 0 || strcasecmp($name, 'Bt') === 0) {
-            return 'Cylindrical Shaft';
+        if (empty($name)) {
+            return 'Unknown Component';
         }
 
         return $name;
@@ -373,8 +373,7 @@ class DrawingSpecExtractionService
         if (!empty($cleaned) 
             && !preg_match('/^PN-[A-F0-9]{6}$/i', $cleaned) 
             && !preg_match('/^[a-f0-9]{32,}$/i', $cleaned)
-            && !preg_match('/\.(pdf|png|jpg|jpeg|webp)$/i', $cleaned)
-            && strlen($cleaned) >= 3) {
+            && !preg_match('/\.(pdf|png|jpg|jpeg|webp)$/i', $cleaned)) {
             return strtoupper($cleaned);
         }
 
@@ -403,8 +402,8 @@ class DrawingSpecExtractionService
         }
 
         $code = implode('-', array_slice($codeTokens, 0, 3));
-        if (strlen($code) < 3) {
-            $code = 'PART-01';
+        if (empty($code)) {
+            $code = 'PART';
         }
 
         return 'DWG-' . $code . '-01';
