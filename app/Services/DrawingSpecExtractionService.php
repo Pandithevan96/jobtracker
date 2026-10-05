@@ -140,6 +140,8 @@ class DrawingSpecExtractionService
                                 'process_type' => 0.94,
                                 'material' => 0.95,
                             ],
+                            'extraction_source' => 'ai_vision',
+                            'is_fallback' => false,
                         ];
                     }
                 }
@@ -201,6 +203,8 @@ class DrawingSpecExtractionService
                                 'process_type' => 0.93,
                                 'material' => 0.94,
                             ],
+                            'extraction_source' => 'ai_vision',
+                            'is_fallback' => false,
                         ];
                     }
                 }
@@ -227,6 +231,9 @@ class DrawingSpecExtractionService
                                 ],
                             ],
                         ],
+                    ],
+                    'generationConfig' => [
+                        'responseMimeType' => 'application/json',
                     ],
                 ]);
 
@@ -259,9 +266,12 @@ class DrawingSpecExtractionService
                                     'process_type' => 0.93,
                                     'material' => 0.94,
                                 ],
+                                'extraction_source' => 'ai_vision',
+                                'is_fallback' => false,
                             ];
                         }
                     }
+                    Log::warning('Gemini Vision extraction returned no parseable part_name.');
                 } else {
                     $errorBody = $response->body();
                     Log::error('Gemini API Error: '.$errorBody);
@@ -338,6 +348,8 @@ class DrawingSpecExtractionService
                 'process_type' => 0.88,
                 'material' => 0.92,
             ],
+            'extraction_source' => 'filename_fallback',
+            'is_fallback' => true,
         ];
     }
 

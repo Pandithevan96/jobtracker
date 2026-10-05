@@ -76,6 +76,26 @@ class DrawingSpecController extends Controller
 
             $extracted = $this->extractionService->extractSpecs($filePath, $localFilePath, $originalName);
 
+            if ($extracted['is_fallback'] ?? false) {
+                DrawingExtractedSpec::create([
+                    'workspace_id' => $workspace->id,
+                    'drawing_path' => $filePath,
+                    'extracted_specs' => $extracted['extracted_specs'],
+                    'confidence_scores' => $extracted['confidence_scores'],
+                    'status' => 'failed',
+                    'extracted_at' => Carbon::now(),
+                ]);
+
+                return HelperFunction::response(
+                    $extracted,
+                    null,
+                    'AI extraction could not read the drawing. Please check Gemini/OpenAI/Anthropic configuration or upload a clearer PDF/image.',
+                    'error',
+                    '006',
+                    Response::HTTP_UNPROCESSABLE_ENTITY
+                );
+            }
+
             $record = DrawingExtractedSpec::create([
                 'workspace_id' => $workspace->id,
                 'drawing_path' => $filePath,
