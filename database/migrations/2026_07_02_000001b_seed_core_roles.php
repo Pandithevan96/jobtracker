@@ -14,7 +14,7 @@ return new class extends Migration
         DB::table('role')->insert([
             ['id' => 1, 'name' => 'Admin',     'description' => 'System administrator',           'status' => 1, 'created_at' => now(), 'updated_at' => now()],
             ['id' => 2, 'name' => 'Principal', 'description' => 'Factory / OEM owner',             'status' => 1, 'created_at' => now(), 'updated_at' => now()],
-            ['id' => 3, 'name' => 'Vendor',    'description' => 'Sub-contractor / job-work vendor','status' => 1, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 3, 'name' => 'Vendor',    'description' => 'Sub-contractor / job-work vendor', 'status' => 1, 'created_at' => now(), 'updated_at' => now()],
         ]);
     }
 

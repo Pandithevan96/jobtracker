@@ -23,14 +23,16 @@ class ClassifyRejectionJob implements ShouldQueue
     {
         $rejection = QualityRejection::find($this->rejectionId);
 
-        if (!$rejection) return;
+        if (! $rejection) {
+            return;
+        }
 
         $result = $service->classify($rejection);
 
         $rejection->update([
-            'ai_defect_tags'        => $result['ai_defect_tags'],
+            'ai_defect_tags' => $result['ai_defect_tags'],
             'ai_suggested_category' => $result['ai_suggested_category'],
-            'ai_confidence'         => $result['ai_confidence'],
+            'ai_confidence' => $result['ai_confidence'],
         ]);
 
         event(new RejectionClassified($rejection));

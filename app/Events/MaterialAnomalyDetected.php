@@ -42,12 +42,12 @@ class MaterialAnomalyDetected implements ShouldBroadcastNow
     {
         return [
             'anomaly' => [
-                'id'            => $this->anomaly->id,
-                'job_order_id'  => $this->anomaly->job_order_id,
-                'variance_qty'  => $this->anomaly->variance_qty,
-                'variance_pct'  => $this->anomaly->variance_pct,
-                'status'        => $this->anomaly->status,
-                'detected_at'   => $this->anomaly->detected_at?->toIso8601String(),
+                'id' => $this->anomaly->id,
+                'job_order_id' => $this->anomaly->job_order_id,
+                'variance_qty' => $this->anomaly->variance_qty,
+                'variance_pct' => $this->anomaly->variance_pct,
+                'status' => $this->anomaly->status,
+                'detected_at' => $this->anomaly->detected_at?->toIso8601String(),
             ],
         ];
     }

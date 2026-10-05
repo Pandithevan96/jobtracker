@@ -2,6 +2,7 @@
 
 namespace App\Models\Job;
 
+use App\Models\Workspace\Workspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -22,14 +23,14 @@ class DrawingExtractedSpec extends Model
     ];
 
     protected $casts = [
-        'extracted_specs'   => 'array',
+        'extracted_specs' => 'array',
         'confidence_scores' => 'array',
-        'extracted_at'      => 'datetime',
+        'extracted_at' => 'datetime',
     ];
 
     public function workspace()
     {
-        return $this->belongsTo(\App\Models\Workspace\Workspace::class, 'workspace_id');
+        return $this->belongsTo(Workspace::class, 'workspace_id');
     }
 
     public function jobOrder()

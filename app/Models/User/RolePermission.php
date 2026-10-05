@@ -38,9 +38,9 @@ class RolePermission extends Model
      */
     protected $casts = [
         'can_access' => 'boolean',
-        'can_view'   => 'boolean',
+        'can_view' => 'boolean',
         'can_create' => 'boolean',
-        'can_edit'   => 'boolean',
+        'can_edit' => 'boolean',
         'can_delete' => 'boolean',
     ];
 
@@ -53,7 +53,7 @@ class RolePermission extends Model
      */
     public function role()
     {
-        return $this->belongsTo(\App\Models\User\Role::class, 'role_id');
+        return $this->belongsTo(Role::class, 'role_id');
     }
 
     /**
@@ -61,6 +61,6 @@ class RolePermission extends Model
      */
     public function module()
     {
-        return $this->belongsTo(\App\Models\User\Module::class, 'module_id');
+        return $this->belongsTo(Module::class, 'module_id');
     }
 }

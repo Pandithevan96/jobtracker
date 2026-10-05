@@ -2,20 +2,16 @@
 
 namespace App\Services;
 
-use App\Models\Vendor\Vendor;
-use App\Models\Vendor\VendorPerformanceScore;
 use App\Models\Job\JobOrder;
 use App\Models\Job\QualityRejection;
+use App\Models\Vendor\Vendor;
+use App\Models\Vendor\VendorPerformanceScore;
 use Illuminate\Support\Carbon;
 
 class VendorRecommendationService
 {
     /**
      * Calculate and return performance scores for all vendors in a workspace.
-     *
-     * @param int $workspaceId
-     * @param string|null $processType
-     * @return array
      */
     public function recommendVendors(int $workspaceId, ?string $processType = null): array
     {
@@ -34,7 +30,7 @@ class VendorRecommendationService
             if ($totalCompleted > 0) {
                 $onTimeCount = 0;
                 foreach ($completedJobs as $job) {
-                    if (!$job->due_date || Carbon::parse($job->updated_at)->lte(Carbon::parse($job->due_date))) {
+                    if (! $job->due_date || Carbon::parse($job->updated_at)->lte(Carbon::parse($job->due_date))) {
                         $onTimeCount++;
                     }
                 }
@@ -42,7 +38,7 @@ class VendorRecommendationService
             }
 
             // 2. Quality Yield Score
-            $totalScrapQty = (float) QualityRejection::whereHas('jobOrder', fn($q) => $q->where('vendor_id', $vendor->id))
+            $totalScrapQty = (float) QualityRejection::whereHas('jobOrder', fn ($q) => $q->where('vendor_id', $vendor->id))
                 ->where('rejection_type', QualityRejection::TYPE_SCRAP)
                 ->sum('rejected_qty');
 
@@ -68,15 +64,15 @@ class VendorRecommendationService
             VendorPerformanceScore::updateOrCreate(
                 [
                     'workspace_id' => $workspaceId,
-                    'vendor_id'    => $vendor->id,
+                    'vendor_id' => $vendor->id,
                 ],
                 [
-                    'overall_score'              => $overallScore,
-                    'on_time_delivery_score'     => $onTimeScore,
-                    'quality_yield_score'        => $qualityScore,
+                    'overall_score' => $overallScore,
+                    'on_time_delivery_score' => $onTimeScore,
+                    'quality_yield_score' => $qualityScore,
                     'capacity_utilization_score' => round($capacityScore, 2),
-                    'total_jobs_completed'       => $totalCompleted,
-                    'calculated_at'              => Carbon::now(),
+                    'total_jobs_completed' => $totalCompleted,
+                    'calculated_at' => Carbon::now(),
                 ]
             );
 
@@ -93,22 +89,22 @@ class VendorRecommendationService
             }
 
             $recommendations[] = [
-                'vendor_id'                  => $vendor->id,
-                'shop_name'                  => $vendor->shop_name,
-                'contact_person'             => $vendor->contact_person,
-                'phone'                      => $vendor->phone,
-                'overall_score'              => $overallScore,
-                'on_time_delivery_score'     => $onTimeScore,
-                'quality_yield_score'        => $qualityScore,
-                'capacity_score'             => round($capacityScore, 2),
-                'active_wip_count'           => $activeWipCount,
-                'total_jobs_completed'       => $totalCompleted,
-                'recommendation_badge'       => $badge,
+                'vendor_id' => $vendor->id,
+                'shop_name' => $vendor->shop_name,
+                'contact_person' => $vendor->contact_person,
+                'phone' => $vendor->phone,
+                'overall_score' => $overallScore,
+                'on_time_delivery_score' => $onTimeScore,
+                'quality_yield_score' => $qualityScore,
+                'capacity_score' => round($capacityScore, 2),
+                'active_wip_count' => $activeWipCount,
+                'total_jobs_completed' => $totalCompleted,
+                'recommendation_badge' => $badge,
             ];
         }
 
         // Sort descending by overall_score
-        usort($recommendations, fn($a, $b) => $b['overall_score'] <=> $a['overall_score']);
+        usort($recommendations, fn ($a, $b) => $b['overall_score'] <=> $a['overall_score']);
 
         return $recommendations;
     }

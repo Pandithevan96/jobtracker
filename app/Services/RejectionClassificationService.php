@@ -5,21 +5,19 @@ namespace App\Services;
 use App\Models\Job\QualityRejection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class RejectionClassificationService
 {
     /**
      * Classify defect type and suggested rejection category for a QualityRejection.
-     *
-     * @param QualityRejection $rejection
-     * @return array
      */
     public function classify(QualityRejection $rejection): array
     {
         $apiKey = null;
         try {
             $apiKey = config('services.anthropic.api_key');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $apiKey = env('ANTHROPIC_API_KEY');
         }
         $photoUrl = $rejection->photo_path;
@@ -28,15 +26,15 @@ class RejectionClassificationService
         if ($apiKey && $photoUrl) {
             try {
                 $response = Http::withHeaders([
-                    'x-api-key'         => $apiKey,
+                    'x-api-key' => $apiKey,
                     'anthropic-version' => '2023-06-01',
-                    'content-type'      => 'application/json',
+                    'content-type' => 'application/json',
                 ])->post('https://api.anthropic.com/v1/messages', [
-                    'model'      => 'claude-3-5-sonnet-20241022',
+                    'model' => 'claude-3-5-sonnet-20241022',
                     'max_tokens' => 300,
-                    'messages'   => [
+                    'messages' => [
                         [
-                            'role'    => 'user',
+                            'role' => 'user',
                             'content' => [
                                 [
                                     'type' => 'text',
@@ -45,8 +43,8 @@ class RejectionClassificationService
                                 [
                                     'type' => 'image',
                                     'source' => [
-                                        'type'       => 'url',
-                                        'url'        => $photoUrl,
+                                        'type' => 'url',
+                                        'url' => $photoUrl,
                                     ],
                                 ],
                             ],
@@ -59,15 +57,15 @@ class RejectionClassificationService
                     $parsed = json_decode($jsonContent, true);
                     if (is_array($parsed) && isset($parsed['suggested_category'])) {
                         return [
-                            'ai_defect_tags'        => $parsed['tags'] ?? ['vision_classified'],
+                            'ai_defect_tags' => $parsed['tags'] ?? ['vision_classified'],
                             'ai_suggested_category' => strtolower($parsed['suggested_category']),
-                            'ai_confidence'         => (float) ($parsed['confidence'] ?? 90.0),
-                            'explanation'           => $parsed['explanation'] ?? 'Classified via Anthropic Claude Vision API',
+                            'ai_confidence' => (float) ($parsed['confidence'] ?? 90.0),
+                            'explanation' => $parsed['explanation'] ?? 'Classified via Anthropic Claude Vision API',
                         ];
                     }
                 }
-            } catch (\Throwable $e) {
-                Log::warning('Anthropic Vision API call failed, falling back to heuristic classifier: ' . $e->getMessage());
+            } catch (Throwable $e) {
+                Log::warning('Anthropic Vision API call failed, falling back to heuristic classifier: '.$e->getMessage());
             }
         }
 
@@ -79,11 +77,15 @@ class RejectionClassificationService
         $reworkMatches = 0;
 
         foreach ($isScrapKeywords as $kw) {
-            if (str_contains($reason, $kw)) $scrapMatches++;
+            if (str_contains($reason, $kw)) {
+                $scrapMatches++;
+            }
         }
 
         foreach ($isReworkKeywords as $kw) {
-            if (str_contains($reason, $kw)) $reworkMatches++;
+            if (str_contains($reason, $kw)) {
+                $reworkMatches++;
+            }
         }
 
         if ($scrapMatches > $reworkMatches) {
@@ -101,10 +103,10 @@ class RejectionClassificationService
         }
 
         return [
-            'ai_defect_tags'        => $tags,
+            'ai_defect_tags' => $tags,
             'ai_suggested_category' => $category,
-            'ai_confidence'         => $confidence,
-            'explanation'           => 'Domain-calibrated defect analyzer',
+            'ai_confidence' => $confidence,
+            'explanation' => 'Domain-calibrated defect analyzer',
         ];
     }
 }

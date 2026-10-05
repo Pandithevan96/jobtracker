@@ -2,22 +2,23 @@
 
 namespace App\Http\Controllers\Job;
 
-use App\Http\Controllers\Controller;
-use App\Helpers\HelperFunction;
-use App\Services\NotificationService;
-use App\Services\CloudinaryService;
 use App\Events\OrderNoteCreated;
+use App\Helpers\HelperFunction;
+use App\Http\Controllers\Controller;
 use App\Models\Job\JobOrder;
 use App\Models\Job\JobOrderNote;
 use App\Models\Job\JobOrderStatusLog;
-use App\Models\Workspace\Workspace;
+use App\Models\User\User;
 use App\Models\Vendor\Vendor;
+use App\Models\Workspace\Workspace;
+use App\Services\NotificationService;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class JobOrderController extends Controller
 {
@@ -27,7 +28,7 @@ class JobOrderController extends Controller
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_create) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_create) {
                 return HelperFunction::response(null, null, 'You do not have permission to create job orders', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -35,7 +36,7 @@ class JobOrderController extends Controller
 
             // ── Guard 1: Must have at least one owned workspace ──────────────
             $ownedWorkspace = Workspace::where('owner_id', $user->id)->first();
-            if (!$ownedWorkspace) {
+            if (! $ownedWorkspace) {
                 return HelperFunction::response(
                     null, null,
                     'You must create a workspace before issuing job orders. Please set up your company workspace first.',
@@ -54,34 +55,34 @@ class JobOrderController extends Controller
             }
 
             // Field aliases mapping
-            if (!$request->has('part_name') && $request->has('item_name')) {
+            if (! $request->has('part_name') && $request->has('item_name')) {
                 $request->merge(['part_name' => $request->input('item_name')]);
             }
-            if (!$request->has('quantity_sent') && $request->has('quantity')) {
+            if (! $request->has('quantity_sent') && $request->has('quantity')) {
                 $request->merge(['quantity_sent' => $request->input('quantity')]);
             }
-            if (!$request->has('due_date') && $request->has('expected_delivery_date')) {
+            if (! $request->has('due_date') && $request->has('expected_delivery_date')) {
                 $request->merge(['due_date' => $request->input('expected_delivery_date')]);
             }
 
             // Auto-resolve workspace_id if omitted
-            if (!$request->filled('workspace_id')) {
+            if (! $request->filled('workspace_id')) {
                 $request->merge(['workspace_id' => $ownedWorkspace->id]);
             }
 
             $validation = Validator::make($request->all(), [
-                'workspace_id'  => 'required|integer|exists:workspaces,id',
-                'vendor_id'     => 'required|integer|exists:vendors,id',
-                'part_name'     => 'required|string|max:255',
-                'part_number'   => 'nullable|string|max:100',
-                'description'   => 'nullable|string',
-                'process_type'  => 'nullable|string|max:100',
+                'workspace_id' => 'required|integer|exists:workspaces,id',
+                'vendor_id' => 'required|integer|exists:vendors,id',
+                'part_name' => 'required|string|max:255',
+                'part_number' => 'nullable|string|max:100',
+                'description' => 'nullable|string',
+                'process_type' => 'nullable|string|max:100',
                 'quantity_sent' => 'required|numeric|min:0.01',
-                'uom'           => 'nullable|string|max:20',
-                'due_date'      => 'required|date',
-                'status'        => 'nullable|integer|in:1,2',
-                'priority'      => 'nullable|integer|in:1,2,3,4',
-                'notes'         => 'nullable|string',
+                'uom' => 'nullable|string|max:20',
+                'due_date' => 'required|date',
+                'status' => 'nullable|integer|in:1,2',
+                'priority' => 'nullable|integer|in:1,2,3,4',
+                'notes' => 'nullable|string',
             ]);
 
             if ($validation->fails()) {
@@ -91,13 +92,13 @@ class JobOrderController extends Controller
             $workspaceId = $request->input('workspace_id');
 
             $workspace = Workspace::where('id', $workspaceId)
-                ->where(function ($q) use ($user) { 
+                ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'Workspace not found or you do not belong to it', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -105,43 +106,43 @@ class JobOrderController extends Controller
                 ->where('workspace_id', $workspaceId)
                 ->first();
 
-            if (!$vendor) {
+            if (! $vendor) {
                 return HelperFunction::response(null, null, 'Selected vendor does not belong to this workspace', 'error', '003', Response::HTTP_NOT_FOUND);
             }
 
             $status = $request->input('status', JobOrder::STATUS_DRAFT);
 
             $jobOrder = JobOrder::create([
-                'workspace_id'  => $workspaceId,
-                'vendor_id'     => $vendor->id,
-                'created_by'    => $user->id,
-                'part_name'     => $request->input('part_name'),
-                'part_number'   => $request->input('part_number'),
-                'description'   => $request->input('description'),
-                'process_type'  => $request->input('process_type'),
+                'workspace_id' => $workspaceId,
+                'vendor_id' => $vendor->id,
+                'created_by' => $user->id,
+                'part_name' => $request->input('part_name'),
+                'part_number' => $request->input('part_number'),
+                'description' => $request->input('description'),
+                'process_type' => $request->input('process_type'),
                 'quantity_sent' => $request->input('quantity_sent'),
-                'uom'           => $request->input('uom', 'Nos'),
-                'due_date'      => $request->input('due_date'),
-                'status'        => $status,
-                'priority'      => $request->input('priority', JobOrder::PRIORITY_NORMAL),
-                'notes'         => $request->input('notes'),
+                'uom' => $request->input('uom', 'Nos'),
+                'due_date' => $request->input('due_date'),
+                'status' => $status,
+                'priority' => $request->input('priority', JobOrder::PRIORITY_NORMAL),
+                'notes' => $request->input('notes'),
             ]);
 
             // Auto-link vendor user as workspace member if vendor has user_id or email
             if ($vendor->user_id) {
                 $workspace->members()->syncWithoutDetaching([
                     $vendor->user_id => [
-                        'role'   => Workspace::MEMBER_ROLE_VENDOR,
+                        'role' => Workspace::MEMBER_ROLE_VENDOR,
                         'status' => Workspace::MEMBER_STATUS_ACTIVE,
                     ],
                 ]);
             } elseif ($vendor->email) {
-                $targetUser = \App\Models\User\User::where('email', $vendor->email)->first();
+                $targetUser = User::where('email', $vendor->email)->first();
                 if ($targetUser && $targetUser->id !== $user->id) {
                     $vendor->update(['user_id' => $targetUser->id]);
                     $workspace->members()->syncWithoutDetaching([
                         $targetUser->id => [
-                            'role'   => Workspace::MEMBER_ROLE_VENDOR,
+                            'role' => Workspace::MEMBER_ROLE_VENDOR,
                             'status' => Workspace::MEMBER_STATUS_ACTIVE,
                         ],
                     ]);
@@ -150,11 +151,11 @@ class JobOrderController extends Controller
 
             JobOrderStatusLog::create([
                 'job_order_id' => $jobOrder->id,
-                'changed_by'   => $user->id,
-                'from_status'  => null,
-                'to_status'    => $status,
-                'changed_via'  => JobOrderStatusLog::VIA_WEB,
-                'notes'        => 'Job Order created.',
+                'changed_by' => $user->id,
+                'from_status' => null,
+                'to_status' => $status,
+                'changed_via' => JobOrderStatusLog::VIA_WEB,
+                'notes' => 'Job Order created.',
             ]);
 
             // Notify the assigned vendor that a new job order has been created
@@ -162,7 +163,7 @@ class JobOrderController extends Controller
 
             return HelperFunction::response($jobOrder, null, 'Job Order created successfully', 'success', '000', Response::HTTP_CREATED);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to create job order: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to create job order: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -170,15 +171,15 @@ class JobOrderController extends Controller
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_view) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_view) {
                 return HelperFunction::response(null, null, 'You do not have permission to view job orders', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             $validation = Validator::make($request->all(), [
                 'workspace_id' => 'nullable|integer',
-                'status'       => 'nullable|integer',
-                'vendor_id'    => 'nullable|integer',
-                'priority'     => 'nullable|integer',
+                'status' => 'nullable|integer',
+                'vendor_id' => 'nullable|integer',
+                'priority' => 'nullable|integer',
             ]);
 
             if ($validation->fails()) {
@@ -193,19 +194,19 @@ class JobOrderController extends Controller
                 $workspace = Workspace::where('id', $workspaceId)
                     ->where(function ($q) use ($user) {
                         $q->where('owner_id', $user->id)
-                            ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                            ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                     })
                     ->first();
             }
 
-            if (!$workspace) {
+            if (! $workspace) {
                 $workspace = Workspace::where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })->first();
             }
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response([], null, 'Job Orders fetched successfully', 'success', '000', Response::HTTP_OK);
             }
 
@@ -213,7 +214,7 @@ class JobOrderController extends Controller
 
             // Auto-link vendor records matching user's workspace names
             $myWorkspaceNames = Workspace::where('owner_id', $user->id)->pluck('name')->toArray();
-            if (!empty($myWorkspaceNames)) {
+            if (! empty($myWorkspaceNames)) {
                 Vendor::whereIn('shop_name', $myWorkspaceNames)
                     ->whereNull('user_id')
                     ->update(['user_id' => $user->id]);
@@ -224,8 +225,12 @@ class JobOrderController extends Controller
             // Find all Vendor IDs associated with this user
             $myVendorIds = Vendor::where('user_id', $user->id)
                 ->orWhere(function ($q) use ($user) {
-                    if ($user->email) $q->where('email', $user->email);
-                    if ($user->phone) $q->orWhere('phone', $user->phone);
+                    if ($user->email) {
+                        $q->where('email', $user->email);
+                    }
+                    if ($user->phone) {
+                        $q->orWhere('phone', $user->phone);
+                    }
                 })
                 ->pluck('id');
 
@@ -247,7 +252,7 @@ class JobOrderController extends Controller
             if ($request->filled('status')) {
                 $query->where('status', $request->input('status'));
             }
-            if ($request->filled('vendor_id') && !$isVendorOfThisWorkspace) {
+            if ($request->filled('vendor_id') && ! $isVendorOfThisWorkspace) {
                 $query->where('vendor_id', $request->input('vendor_id'));
             }
             if ($request->filled('priority')) {
@@ -258,7 +263,7 @@ class JobOrderController extends Controller
 
             return HelperFunction::response($jobOrders, null, 'Job Orders fetched successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to list job orders: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to list job orders: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -266,7 +271,7 @@ class JobOrderController extends Controller
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_view) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_view) {
                 return HelperFunction::response(null, null, 'You do not have permission to view job order details', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -284,17 +289,17 @@ class JobOrderController extends Controller
             $workspace = Workspace::where('id', $jobOrder->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'You do not have access to this job order', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             return HelperFunction::response($jobOrder, null, 'Job Order details fetched successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to get job order details: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to get job order details: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -302,16 +307,16 @@ class JobOrderController extends Controller
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_edit) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_edit) {
                 return HelperFunction::response(null, null, 'You do not have permission to update job order status', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             $validation = Validator::make($request->all(), [
-                'id'               => 'required|integer|exists:job_orders,id',
-                'status'           => 'required|integer|in:1,2,3,4,5,6,7',
-                'changed_via'      => 'nullable|integer|in:1,2,3,4',
+                'id' => 'required|integer|exists:job_orders,id',
+                'status' => 'required|integer|in:1,2,3,4,5,6,7',
+                'changed_via' => 'nullable|integer|in:1,2,3,4',
                 'photo_proof_path' => 'nullable|string',
-                'notes'            => 'nullable|string',
+                'notes' => 'nullable|string',
             ]);
 
             if ($validation->fails()) {
@@ -325,11 +330,11 @@ class JobOrderController extends Controller
             $workspace = Workspace::where('id', $jobOrder->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'You do not have access to this job order', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -340,7 +345,7 @@ class JobOrderController extends Controller
                     ->wherePivot('role', Workspace::MEMBER_ROLE_VENDOR)
                     ->exists();
 
-            if ($isVendorOfThisWorkspace && !in_array($newStatus, [
+            if ($isVendorOfThisWorkspace && ! in_array($newStatus, [
                 JobOrder::STATUS_WIP,
                 JobOrder::STATUS_READY,
                 JobOrder::STATUS_DISPATCHED_BACK,
@@ -353,13 +358,13 @@ class JobOrderController extends Controller
             $jobOrder->update(['status' => $newStatus]);
 
             JobOrderStatusLog::create([
-                'job_order_id'     => $jobOrder->id,
-                'changed_by'       => $user->id,
-                'from_status'      => $oldStatus,
-                'to_status'        => $newStatus,
-                'changed_via'      => $request->input('changed_via', JobOrderStatusLog::VIA_WEB),
+                'job_order_id' => $jobOrder->id,
+                'changed_by' => $user->id,
+                'from_status' => $oldStatus,
+                'to_status' => $newStatus,
+                'changed_via' => $request->input('changed_via', JobOrderStatusLog::VIA_WEB),
                 'photo_proof_path' => $request->input('photo_proof_path'),
-                'notes'            => $request->input('notes'),
+                'notes' => $request->input('notes'),
             ]);
 
             NotificationService::dispatchJobStatusChange(
@@ -371,7 +376,7 @@ class JobOrderController extends Controller
 
             return HelperFunction::response($jobOrder->fresh(), null, 'Job Order status updated successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to update job order status: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to update job order status: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -379,12 +384,12 @@ class JobOrderController extends Controller
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_edit) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_edit) {
                 return HelperFunction::response(null, null, 'You do not have permission to upload documents', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             $validation = Validator::make($request->all(), [
-                'id'   => 'required|integer|exists:job_orders,id',
+                'id' => 'required|integer|exists:job_orders,id',
                 'file' => 'required|file|mimes:jpg,jpeg,png,pdf,dwg|max:10240',
             ]);
 
@@ -392,45 +397,45 @@ class JobOrderController extends Controller
                 return HelperFunction::response(null, null, $validation->errors()->first(), 'error', '001', Response::HTTP_BAD_REQUEST);
             }
 
-            $user     = Auth::user();
+            $user = Auth::user();
             $jobOrder = JobOrder::find($request->input('id'));
 
             $workspace = Workspace::where('id', $jobOrder->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'You do not have access to this job order', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
-            $file         = $request->file('file');
+            $file = $request->file('file');
             $originalName = $file->getClientOriginalName();
-            $ext          = strtolower($file->getClientOriginalExtension() ?: 'bin');
-            $filename     = 'doc_' . date('YmdHis') . '_' . uniqid() . '.' . $ext;
+            $ext = strtolower($file->getClientOriginalExtension() ?: 'bin');
+            $filename = 'doc_'.date('YmdHis').'_'.uniqid().'.'.$ext;
 
             // Store file locally on server disk
             try {
                 $file->storeAs('job_documents', $filename, 'public');
-            } catch (\Throwable $fsEx) {
-                \Illuminate\Support\Facades\Log::warning('Disk write warning: ' . $fsEx->getMessage());
+            } catch (Throwable $fsEx) {
+                Log::warning('Disk write warning: '.$fsEx->getMessage());
             }
 
             // Convert file to Data URL stored permanently in database (0% chance of 404 across container rebuilds)
-            $mime         = $file->getMimeType() ?: 'application/octet-stream';
-            $base64Data   = base64_encode(file_get_contents($file->getRealPath()));
-            $url          = "data:{$mime};base64,{$base64Data}";
-            $path         = $url;
+            $mime = $file->getMimeType() ?: 'application/octet-stream';
+            $base64Data = base64_encode(file_get_contents($file->getRealPath()));
+            $url = "data:{$mime};base64,{$base64Data}";
+            $path = $url;
 
             $existing = $jobOrder->drawing_urls ?? [];
             $existing[] = [
-                'path'          => $path,
-                'url'           => $url,
+                'path' => $path,
+                'url' => $url,
                 'original_name' => $originalName,
-                'uploaded_by'   => $user->id,
-                'uploaded_at'   => now()->toISOString(),
+                'uploaded_by' => $user->id,
+                'uploaded_at' => now()->toISOString(),
             ];
             $jobOrder->update(['drawing_urls' => $existing]);
 
@@ -443,7 +448,7 @@ class JobOrderController extends Controller
                 Response::HTTP_CREATED
             );
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to upload document: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to upload document: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -451,13 +456,13 @@ class JobOrderController extends Controller
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access) {
+            if (! $rolePermission || ! $rolePermission->can_access) {
                 return HelperFunction::response(null, null, 'Permission denied', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             $validation = Validator::make($request->all(), [
-                'id'         => 'required|integer|exists:job_orders,id',
-                'note'       => 'nullable|string|max:2000',
+                'id' => 'required|integer|exists:job_orders,id',
+                'note' => 'nullable|string|max:2000',
                 'attachment' => 'nullable|file|max:20480',
             ]);
 
@@ -465,37 +470,37 @@ class JobOrderController extends Controller
                 return HelperFunction::response(null, null, $validation->errors()->first(), 'error', '001', Response::HTTP_BAD_REQUEST);
             }
 
-            if (!$request->filled('note') && !$request->hasFile('attachment')) {
+            if (! $request->filled('note') && ! $request->hasFile('attachment')) {
                 return HelperFunction::response(null, null, 'Please enter a note or attach a photo/PDF.', 'error', '001', Response::HTTP_BAD_REQUEST);
             }
 
-            $user     = Auth::user();
+            $user = Auth::user();
             $jobOrder = JobOrder::find($request->input('id'));
 
             $workspace = Workspace::where('id', $jobOrder->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'You do not have access to this job order', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
-            $attachmentUrl  = null;
+            $attachmentUrl = null;
             $attachmentName = null;
             $attachmentType = null;
 
             if ($request->hasFile('attachment')) {
-                $file           = $request->file('attachment');
+                $file = $request->file('attachment');
                 $attachmentName = $file->getClientOriginalName();
-                $ext            = strtolower($file->getClientOriginalExtension() ?: 'bin');
-                $filename       = 'note_' . date('YmdHis') . '_' . uniqid() . '.' . $ext;
+                $ext = strtolower($file->getClientOriginalExtension() ?: 'bin');
+                $filename = 'note_'.date('YmdHis').'_'.uniqid().'.'.$ext;
 
                 $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'dwg', 'csv', 'txt'];
-                if (!in_array($ext, $allowed)) {
-                    return HelperFunction::response(null, null, 'Invalid file extension: .' . $ext, 'error', '001', Response::HTTP_BAD_REQUEST);
+                if (! in_array($ext, $allowed)) {
+                    return HelperFunction::response(null, null, 'Invalid file extension: .'.$ext, 'error', '001', Response::HTTP_BAD_REQUEST);
                 }
 
                 if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
@@ -509,24 +514,24 @@ class JobOrderController extends Controller
                 // Store file locally on server disk
                 try {
                     $file->storeAs('note_attachments', $filename, 'public');
-                } catch (\Throwable $fsEx) {
-                    \Illuminate\Support\Facades\Log::warning('Disk write warning: ' . $fsEx->getMessage());
+                } catch (Throwable $fsEx) {
+                    Log::warning('Disk write warning: '.$fsEx->getMessage());
                 }
 
                 // Convert file to Data URL stored permanently in database LONGTEXT column (0% chance of 404 across container rebuilds)
-                $mime          = $file->getMimeType() ?: 'application/octet-stream';
-                $base64Data    = base64_encode(file_get_contents($file->getRealPath()));
+                $mime = $file->getMimeType() ?: 'application/octet-stream';
+                $base64Data = base64_encode(file_get_contents($file->getRealPath()));
                 $attachmentUrl = "data:{$mime};base64,{$base64Data}";
             }
 
             $authorRole = $user->isVendor() ? JobOrderNote::ROLE_VENDOR : JobOrderNote::ROLE_PRINCIPAL;
 
             $note = JobOrderNote::create([
-                'job_order_id'    => $jobOrder->id,
-                'user_id'         => $user->id,
-                'note'            => $request->input('note') ?? '',
-                'author_role'     => $authorRole,
-                'attachment_url'  => $attachmentUrl,
+                'job_order_id' => $jobOrder->id,
+                'user_id' => $user->id,
+                'note' => $request->input('note') ?? '',
+                'author_role' => $authorRole,
+                'attachment_url' => $attachmentUrl,
                 'attachment_name' => $attachmentName,
                 'attachment_type' => $attachmentType,
             ]);
@@ -538,27 +543,27 @@ class JobOrderController extends Controller
                 broadcast(new OrderNoteCreated(
                     jobOrderId: $jobOrder->id,
                     note: [
-                        'id'              => $note->id,
-                        'note'            => $note->note,
-                        'author_role'     => $note->author_role,
-                        'user_id'         => $note->user_id,
-                        'created_at'      => $note->created_at->toISOString(),
-                        'attachment_url'  => $note->attachment_url,
+                        'id' => $note->id,
+                        'note' => $note->note,
+                        'author_role' => $note->author_role,
+                        'user_id' => $note->user_id,
+                        'created_at' => $note->created_at->toISOString(),
+                        'attachment_url' => $note->attachment_url,
                         'attachment_name' => $note->attachment_name,
                         'attachment_type' => $note->attachment_type,
-                        'user'            => $note->user ? [
-                            'id'   => $note->user->id,
+                        'user' => $note->user ? [
+                            'id' => $note->user->id,
                             'name' => $note->user->name,
                         ] : null,
                     ]
                 ));
-            } catch (\Throwable $bEx) {
-                \Illuminate\Support\Facades\Log::warning('WebSocket broadcast error (note saved anyway): ' . $bEx->getMessage());
+            } catch (Throwable $bEx) {
+                Log::warning('WebSocket broadcast error (note saved anyway): '.$bEx->getMessage());
             }
 
             return HelperFunction::response($note, null, 'Note added successfully', 'success', '000', Response::HTTP_CREATED);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to add note: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to add note: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -566,7 +571,7 @@ class JobOrderController extends Controller
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_view) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_view) {
                 return HelperFunction::response(null, null, 'Permission denied', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -578,17 +583,17 @@ class JobOrderController extends Controller
                 return HelperFunction::response(null, null, $validation->errors()->first(), 'error', '001', Response::HTTP_BAD_REQUEST);
             }
 
-            $user     = Auth::user();
+            $user = Auth::user();
             $jobOrder = JobOrder::find($request->input('id'));
 
             $workspace = Workspace::where('id', $jobOrder->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'Access denied', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -596,7 +601,7 @@ class JobOrderController extends Controller
 
             return HelperFunction::response($notes, null, 'Notes fetched successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to fetch notes: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to fetch notes: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

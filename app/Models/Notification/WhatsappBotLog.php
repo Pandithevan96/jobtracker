@@ -2,6 +2,9 @@
 
 namespace App\Models\Notification;
 
+use App\Models\Job\JobOrder;
+use App\Models\Vendor\Vendor;
+use App\Models\Workspace\Workspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -11,9 +14,10 @@ use Illuminate\Database\Eloquent\Model;
  * --------------------------------------------------------------------------------
  * Tracks inbound and outbound WhatsApp communication logs for status update parsing.
  *
- * @package App\Models\Notification
  * @author  Development Team
+ *
  * @version 1.0.0
+ *
  * @since   2026-07-03
  * --------------------------------------------------------------------------------
  */
@@ -22,14 +26,18 @@ class WhatsappBotLog extends Model
     use HasFactory;
 
     // Direction constants
-    const DIRECTION_INBOUND  = 1;
+    const DIRECTION_INBOUND = 1;
+
     const DIRECTION_OUTBOUND = 2;
 
     // Status constants
-    const STATUS_RECEIVED  = 1;
+    const STATUS_RECEIVED = 1;
+
     const STATUS_PROCESSED = 2;
-    const STATUS_FAILED    = 3;
-    const STATUS_IGNORED   = 4;
+
+    const STATUS_FAILED = 3;
+
+    const STATUS_IGNORED = 4;
 
     /**
      * The table associated with the model.
@@ -63,7 +71,7 @@ class WhatsappBotLog extends Model
      */
     protected $casts = [
         'direction' => 'integer',
-        'status'    => 'integer',
+        'status' => 'integer',
     ];
 
     // -------------------------------------------------------------------------
@@ -72,16 +80,16 @@ class WhatsappBotLog extends Model
 
     public function workspace()
     {
-        return $this->belongsTo(\App\Models\Workspace\Workspace::class, 'workspace_id');
+        return $this->belongsTo(Workspace::class, 'workspace_id');
     }
 
     public function vendor()
     {
-        return $this->belongsTo(\App\Models\Vendor\Vendor::class, 'vendor_id');
+        return $this->belongsTo(Vendor::class, 'vendor_id');
     }
 
     public function jobOrder()
     {
-        return $this->belongsTo(\App\Models\Job\JobOrder::class, 'job_order_id');
+        return $this->belongsTo(JobOrder::class, 'job_order_id');
     }
 }

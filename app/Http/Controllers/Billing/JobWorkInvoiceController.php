@@ -2,12 +2,10 @@
 
 namespace App\Http\Controllers\Billing;
 
-use App\Http\Controllers\Controller;
 use App\Helpers\HelperFunction;
+use App\Http\Controllers\Controller;
 use App\Models\Billing\JobWorkInvoice;
 use App\Models\Billing\JobWorkInvoiceItem;
-use App\Models\Challan\DeliveryChallan;
-use App\Models\Job\JobOrder;
 use App\Models\Vendor\Vendor;
 use App\Models\Workspace\Workspace;
 use Exception;
@@ -24,7 +22,7 @@ class JobWorkInvoiceController extends Controller
         return Workspace::where('id', $workspaceId)
             ->where(function ($q) use ($user) {
                 $q->where('owner_id', $user->id)
-                  ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                    ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
             })
             ->first();
     }
@@ -37,22 +35,22 @@ class JobWorkInvoiceController extends Controller
     {
         try {
             $validation = Validator::make($request->all(), [
-                'workspace_id'        => 'required|integer|exists:workspaces,id',
-                'vendor_id'           => 'required|integer|exists:vendors,id',
-                'job_order_id'        => 'nullable|integer|exists:job_orders,id',
+                'workspace_id' => 'required|integer|exists:workspaces,id',
+                'vendor_id' => 'required|integer|exists:vendors,id',
+                'job_order_id' => 'nullable|integer|exists:job_orders,id',
                 'delivery_challan_id' => 'nullable|integer|exists:delivery_challans,id',
-                'invoice_number'      => 'required|string|max:50',
-                'invoice_date'        => 'required|date',
-                'due_date'            => 'nullable|date|after_or_equal:invoice_date',
-                'sac_code'            => 'nullable|string|max:20',
-                'gst_rate'            => 'nullable|numeric|min:0|max:28',
-                'items'               => 'required|array|min:1',
+                'invoice_number' => 'required|string|max:50',
+                'invoice_date' => 'required|date',
+                'due_date' => 'nullable|date|after_or_equal:invoice_date',
+                'sac_code' => 'nullable|string|max:20',
+                'gst_rate' => 'nullable|numeric|min:0|max:28',
+                'items' => 'required|array|min:1',
                 'items.*.service_description' => 'required|string|max:255',
-                'items.*.sac_code'    => 'nullable|string|max:20',
-                'items.*.quantity'    => 'required|numeric|min:0.01',
-                'items.*.uom'         => 'nullable|string|max:20',
-                'items.*.rate'        => 'required|numeric|min:0',
-                'notes'               => 'nullable|string',
+                'items.*.sac_code' => 'nullable|string|max:20',
+                'items.*.quantity' => 'required|numeric|min:0.01',
+                'items.*.uom' => 'nullable|string|max:20',
+                'items.*.rate' => 'required|numeric|min:0',
+                'notes' => 'nullable|string',
             ]);
 
             if ($validation->fails()) {
@@ -63,7 +61,7 @@ class JobWorkInvoiceController extends Controller
             $workspaceId = $request->input('workspace_id');
 
             $workspace = $this->resolveWorkspace($workspaceId, $user);
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'Workspace not found or access denied', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -71,7 +69,7 @@ class JobWorkInvoiceController extends Controller
                 ->where('workspace_id', $workspaceId)
                 ->first();
 
-            if (!$vendor) {
+            if (! $vendor) {
                 return HelperFunction::response(null, null, 'Vendor not found in workspace', 'error', '003', Response::HTTP_NOT_FOUND);
             }
 
@@ -94,24 +92,24 @@ class JobWorkInvoiceController extends Controller
             $totalAmount = $taxableTotal + $gstAmount;
 
             $invoice = JobWorkInvoice::create([
-                'workspace_id'        => $workspaceId,
-                'vendor_id'           => $vendor->id,
-                'job_order_id'        => $request->input('job_order_id'),
+                'workspace_id' => $workspaceId,
+                'vendor_id' => $vendor->id,
+                'job_order_id' => $request->input('job_order_id'),
                 'delivery_challan_id' => $request->input('delivery_challan_id'),
-                'created_by'          => $user->id,
-                'invoice_number'      => $request->input('invoice_number'),
-                'invoice_date'        => $request->input('invoice_date'),
-                'due_date'            => $request->input('due_date'),
-                'sac_code'            => $request->input('sac_code', '9988'),
-                'taxable_amount'      => $taxableTotal,
-                'gst_rate'            => $gstRate,
-                'cgst_amount'         => $cgst,
-                'sgst_amount'         => $sgst,
-                'igst_amount'         => $igst,
-                'total_amount'        => $totalAmount,
-                'payment_status'      => JobWorkInvoice::PAYMENT_UNPAID,
-                'amount_paid'         => 0.00,
-                'notes'               => $request->input('notes'),
+                'created_by' => $user->id,
+                'invoice_number' => $request->input('invoice_number'),
+                'invoice_date' => $request->input('invoice_date'),
+                'due_date' => $request->input('due_date'),
+                'sac_code' => $request->input('sac_code', '9988'),
+                'taxable_amount' => $taxableTotal,
+                'gst_rate' => $gstRate,
+                'cgst_amount' => $cgst,
+                'sgst_amount' => $sgst,
+                'igst_amount' => $igst,
+                'total_amount' => $totalAmount,
+                'payment_status' => JobWorkInvoice::PAYMENT_UNPAID,
+                'amount_paid' => 0.00,
+                'notes' => $request->input('notes'),
             ]);
 
             foreach ($request->input('items') as $item) {
@@ -120,13 +118,13 @@ class JobWorkInvoiceController extends Controller
                 $taxable = $qty * $rate;
 
                 JobWorkInvoiceItem::create([
-                    'invoice_id'          => $invoice->id,
+                    'invoice_id' => $invoice->id,
                     'service_description' => $item['service_description'],
-                    'sac_code'            => $item['sac_code'] ?? $request->input('sac_code', '9988'),
-                    'quantity'            => $qty,
-                    'uom'                 => $item['uom'] ?? 'Nos',
-                    'rate'                => $rate,
-                    'taxable_amount'      => $taxable,
+                    'sac_code' => $item['sac_code'] ?? $request->input('sac_code', '9988'),
+                    'quantity' => $qty,
+                    'uom' => $item['uom'] ?? 'Nos',
+                    'rate' => $rate,
+                    'taxable_amount' => $taxable,
                 ]);
             }
 
@@ -138,7 +136,8 @@ class JobWorkInvoiceController extends Controller
 
         } catch (Exception $e) {
             DB::rollBack();
-            return HelperFunction::response(null, null, 'Failed to create job work invoice: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+
+            return HelperFunction::response(null, null, 'Failed to create job work invoice: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -154,17 +153,17 @@ class JobWorkInvoiceController extends Controller
 
             $workspace = null;
             if ($workspaceId) {
-                $workspace = $this->resolveWorkspace((int)$workspaceId, $user);
+                $workspace = $this->resolveWorkspace((int) $workspaceId, $user);
             }
 
-            if (!$workspace) {
+            if (! $workspace) {
                 $workspace = Workspace::where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                      ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })->first();
             }
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response([], null, 'Invoices fetched successfully', 'success', '000', Response::HTTP_OK);
             }
 
@@ -182,7 +181,7 @@ class JobWorkInvoiceController extends Controller
 
             return HelperFunction::response($invoices, null, 'Job work invoices fetched successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to list invoices: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to list invoices: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -206,13 +205,13 @@ class JobWorkInvoiceController extends Controller
                 ->find($request->input('id'));
 
             $workspace = $this->resolveWorkspace($invoice->workspace_id, $user);
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'Access denied to this invoice', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             return HelperFunction::response($invoice, null, 'Invoice details fetched successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to fetch invoice details: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to fetch invoice details: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -224,9 +223,9 @@ class JobWorkInvoiceController extends Controller
     {
         try {
             $validation = Validator::make($request->all(), [
-                'id'             => 'required|integer|exists:job_work_invoices,id',
+                'id' => 'required|integer|exists:job_work_invoices,id',
                 'payment_status' => 'required|integer|in:1,2,3', // 1-Unpaid, 2-Partially Paid, 3-Paid
-                'amount_paid'    => 'nullable|numeric|min:0',
+                'amount_paid' => 'nullable|numeric|min:0',
             ]);
 
             if ($validation->fails()) {
@@ -237,7 +236,7 @@ class JobWorkInvoiceController extends Controller
             $invoice = JobWorkInvoice::find($request->input('id'));
 
             $workspace = $this->resolveWorkspace($invoice->workspace_id, $user);
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'Access denied', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -250,12 +249,12 @@ class JobWorkInvoiceController extends Controller
 
             $invoice->update([
                 'payment_status' => $paymentStatus,
-                'amount_paid'    => $amountPaid,
+                'amount_paid' => $amountPaid,
             ]);
 
             return HelperFunction::response($invoice->fresh(), null, 'Invoice payment status updated successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to update invoice status: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to update invoice status: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

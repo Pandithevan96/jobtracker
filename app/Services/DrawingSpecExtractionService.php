@@ -21,12 +21,14 @@ class DrawingSpecExtractionService
         $anthropicKey = null;
         $openAIKey = null;
         $geminiKey = null;
+        $geminiModel = null;
 
         if (function_exists('config')) {
             try {
                 $anthropicKey = config('services.anthropic.api_key');
                 $openAIKey = config('services.openai.api_key');
                 $geminiKey = config('services.gemini.api_key');
+                $geminiModel = config('services.gemini.model');
             } catch (Throwable) {
             }
         }
@@ -34,6 +36,8 @@ class DrawingSpecExtractionService
         $anthropicKey = $anthropicKey ?: (getenv('ANTHROPIC_API_KEY') ?: env('ANTHROPIC_API_KEY'));
         $openAIKey = $openAIKey ?: (getenv('OPENAI_API_KEY') ?: env('OPENAI_API_KEY'));
         $geminiKey = $geminiKey ?: (getenv('GEMINI_API_KEY') ?: env('GEMINI_API_KEY'));
+        $geminiModel = $geminiModel ?: (getenv('GEMINI_MODEL') ?: env('GEMINI_MODEL', 'gemini-2.0-flash'));
+        $geminiModel = preg_replace('/^models\//', '', (string) $geminiModel);
 
         // Prepare Base64 payload for image or PDF rendering
         $base64Data = null;
@@ -210,7 +214,7 @@ class DrawingSpecExtractionService
             try {
                 $response = Http::withHeaders([
                     'Content-Type' => 'application/json',
-                ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={$geminiKey}", [
+                ])->post("https://generativelanguage.googleapis.com/v1beta/models/{$geminiModel}:generateContent?key={$geminiKey}", [
                     'contents' => [
                         [
                             'parts' => [
@@ -261,20 +265,6 @@ class DrawingSpecExtractionService
                 } else {
                     $errorBody = $response->body();
                     Log::error('Gemini API Error: '.$errorBody);
-
-                    return [
-                        'extracted_specs' => [
-                            'part_name' => 'API_ERROR_CHECK_NOTES',
-                            'part_number' => 'ERROR',
-                            'process_type' => 'Error',
-                            'material' => 'Error',
-                            'quantity' => 1,
-                            'uom' => 'PCS',
-                            'tolerances' => null,
-                            'notes' => $errorBody,
-                        ],
-                        'confidence_scores' => [],
-                    ];
                 }
             } catch (Throwable $e) {
                 Log::warning('Gemini Vision extraction failed: '.$e->getMessage());

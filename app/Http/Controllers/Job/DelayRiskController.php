@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Job;
 
-use App\Http\Controllers\Controller;
 use App\Helpers\HelperFunction;
+use App\Http\Controllers\Controller;
 use App\Models\Job\DelayRiskScore;
 use App\Models\Job\JobOrder;
 use App\Models\Workspace\Workspace;
@@ -30,7 +30,7 @@ class DelayRiskController extends Controller
             $user = Auth::user();
             $jobOrder = JobOrder::with(['workspace', 'vendor'])->find($id);
 
-            if (!$jobOrder) {
+            if (! $jobOrder) {
                 return HelperFunction::response(null, null, 'Job Order not found', 'error', '004', Response::HTTP_NOT_FOUND);
             }
 
@@ -42,7 +42,7 @@ class DelayRiskController extends Controller
                 })
                 ->first();
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'Workspace access denied', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -55,19 +55,19 @@ class DelayRiskController extends Controller
                     'job_order_id' => $jobOrder->id,
                 ],
                 [
-                    'vendor_id'            => $jobOrder->vendor_id,
-                    'risk_score'           => $riskData['risk_score'],
-                    'risk_level'           => $riskData['risk_level'],
-                    'delay_probability'    => $riskData['delay_probability'],
+                    'vendor_id' => $jobOrder->vendor_id,
+                    'risk_score' => $riskData['risk_score'],
+                    'risk_level' => $riskData['risk_level'],
+                    'delay_probability' => $riskData['delay_probability'],
                     'estimated_delay_days' => $riskData['estimated_delay_days'],
-                    'risk_factors'         => $riskData['risk_factors'],
-                    'calculated_at'        => Carbon::now(),
+                    'risk_factors' => $riskData['risk_factors'],
+                    'calculated_at' => Carbon::now(),
                 ]
             );
 
             return HelperFunction::response($record, null, 'Job delay risk calculated successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to calculate delay risk: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to calculate delay risk: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -95,7 +95,7 @@ class DelayRiskController extends Controller
                 })->first();
             }
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response([], null, 'Delay risks fetched successfully', 'success', '000', Response::HTTP_OK);
             }
 
@@ -112,13 +112,13 @@ class DelayRiskController extends Controller
                         'job_order_id' => $job->id,
                     ],
                     [
-                        'vendor_id'            => $job->vendor_id,
-                        'risk_score'           => $calc['risk_score'],
-                        'risk_level'           => $calc['risk_level'],
-                        'delay_probability'    => $calc['delay_probability'],
+                        'vendor_id' => $job->vendor_id,
+                        'risk_score' => $calc['risk_score'],
+                        'risk_level' => $calc['risk_level'],
+                        'delay_probability' => $calc['delay_probability'],
                         'estimated_delay_days' => $calc['estimated_delay_days'],
-                        'risk_factors'         => $calc['risk_factors'],
-                        'calculated_at'        => Carbon::now(),
+                        'risk_factors' => $calc['risk_factors'],
+                        'calculated_at' => Carbon::now(),
                     ]
                 );
             }
@@ -134,7 +134,7 @@ class DelayRiskController extends Controller
 
             return HelperFunction::response($risks, null, 'Delay risk analysis fetched successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to fetch delay risks: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to fetch delay risks: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

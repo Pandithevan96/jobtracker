@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('workspace_id')->constrained('workspaces')->onDelete('cascade');
             $table->foreignId('job_order_id')->nullable()->constrained('job_orders')->onDelete('set null');
-            
+
             $table->string('drawing_path');
             $table->json('extracted_specs')->nullable();
             $table->json('confidence_scores')->nullable();

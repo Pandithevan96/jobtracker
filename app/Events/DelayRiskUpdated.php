@@ -33,15 +33,15 @@ class DelayRiskUpdated implements ShouldBroadcastNow
     {
         return [
             'risk' => [
-                'id'                   => $this->riskScore->id,
-                'job_order_id'         => $this->riskScore->job_order_id,
-                'vendor_id'            => $this->riskScore->vendor_id,
-                'risk_score'           => $this->riskScore->risk_score,
-                'risk_level'           => $this->riskScore->risk_level,
-                'delay_probability'    => $this->riskScore->delay_probability,
+                'id' => $this->riskScore->id,
+                'job_order_id' => $this->riskScore->job_order_id,
+                'vendor_id' => $this->riskScore->vendor_id,
+                'risk_score' => $this->riskScore->risk_score,
+                'risk_level' => $this->riskScore->risk_level,
+                'delay_probability' => $this->riskScore->delay_probability,
                 'estimated_delay_days' => $this->riskScore->estimated_delay_days,
-                'risk_factors'         => $this->riskScore->risk_factors,
-                'calculated_at'        => $this->riskScore->calculated_at?->toIso8601String(),
+                'risk_factors' => $this->riskScore->risk_factors,
+                'calculated_at' => $this->riskScore->calculated_at?->toIso8601String(),
             ],
         ];
     }

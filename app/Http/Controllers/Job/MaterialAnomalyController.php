@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Job;
 
-use App\Http\Controllers\Controller;
 use App\Helpers\HelperFunction;
+use App\Http\Controllers\Controller;
 use App\Models\Job\JobOrder;
 use App\Models\Job\MaterialAnomaly;
 use App\Models\Workspace\Workspace;
@@ -31,7 +31,7 @@ class MaterialAnomalyController extends Controller
             $user = Auth::user();
             $jobOrder = JobOrder::with(['workspace', 'vendor'])->find($id);
 
-            if (!$jobOrder) {
+            if (! $jobOrder) {
                 return HelperFunction::response(null, null, 'Job Order not found', 'error', '004', Response::HTTP_NOT_FOUND);
             }
 
@@ -43,7 +43,7 @@ class MaterialAnomalyController extends Controller
                 })
                 ->first();
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'Workspace access denied', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -58,7 +58,7 @@ class MaterialAnomalyController extends Controller
 
             return HelperFunction::response($reconciliationData, null, 'Job reconciliation calculated successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to calculate reconciliation: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to calculate reconciliation: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -86,7 +86,7 @@ class MaterialAnomalyController extends Controller
                 })->first();
             }
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response([], null, 'Anomalies fetched successfully', 'success', '000', Response::HTTP_OK);
             }
 
@@ -104,7 +104,7 @@ class MaterialAnomalyController extends Controller
 
             return HelperFunction::response($anomalies, null, 'Material anomalies fetched successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to fetch material anomalies: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to fetch material anomalies: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -116,7 +116,7 @@ class MaterialAnomalyController extends Controller
     {
         try {
             $validation = Validator::make($request->all(), [
-                'id'               => 'required|integer|exists:material_anomalies,id',
+                'id' => 'required|integer|exists:material_anomalies,id',
                 'resolution_notes' => 'required|string|max:1000',
             ]);
 
@@ -134,21 +134,21 @@ class MaterialAnomalyController extends Controller
                 })
                 ->first();
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'Workspace access denied', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             $anomaly->update([
-                'status'           => 'resolved',
-                'resolved'         => true,
+                'status' => 'resolved',
+                'resolved' => true,
                 'resolution_notes' => $request->input('resolution_notes'),
-                'resolved_by'      => $user->id,
-                'resolved_at'      => Carbon::now(),
+                'resolved_by' => $user->id,
+                'resolved_at' => Carbon::now(),
             ]);
 
             return HelperFunction::response($anomaly, null, 'Anomaly resolved successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to resolve anomaly: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to resolve anomaly: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

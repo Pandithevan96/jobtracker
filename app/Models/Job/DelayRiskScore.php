@@ -2,6 +2,8 @@
 
 namespace App\Models\Job;
 
+use App\Models\Vendor\Vendor;
+use App\Models\Workspace\Workspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -24,16 +26,16 @@ class DelayRiskScore extends Model
     ];
 
     protected $casts = [
-        'risk_score'           => 'float',
-        'delay_probability'    => 'float',
+        'risk_score' => 'float',
+        'delay_probability' => 'float',
         'estimated_delay_days' => 'integer',
-        'risk_factors'         => 'array',
-        'calculated_at'        => 'datetime',
+        'risk_factors' => 'array',
+        'calculated_at' => 'datetime',
     ];
 
     public function workspace()
     {
-        return $this->belongsTo(\App\Models\Workspace\Workspace::class, 'workspace_id');
+        return $this->belongsTo(Workspace::class, 'workspace_id');
     }
 
     public function jobOrder()
@@ -43,6 +45,6 @@ class DelayRiskScore extends Model
 
     public function vendor()
     {
-        return $this->belongsTo(\App\Models\Vendor\Vendor::class, 'vendor_id');
+        return $this->belongsTo(Vendor::class, 'vendor_id');
     }
 }

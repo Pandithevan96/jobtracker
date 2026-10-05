@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Vendor;
 
-use App\Http\Controllers\Controller;
 use App\Helpers\HelperFunction;
+use App\Http\Controllers\Controller;
 use App\Models\Workspace\Workspace;
 use App\Services\VendorRecommendationService;
 use Exception;
@@ -41,7 +41,7 @@ class VendorRecommendationController extends Controller
                 })->first();
             }
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response([], null, 'Vendor recommendations fetched successfully', 'success', '000', Response::HTTP_OK);
             }
 
@@ -50,7 +50,7 @@ class VendorRecommendationController extends Controller
 
             return HelperFunction::response($recommendations, null, 'Vendor recommendations calculated successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to fetch vendor recommendations: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to fetch vendor recommendations: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

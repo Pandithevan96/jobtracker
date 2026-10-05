@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::table('job_orders', function (Blueprint $table) {
             // Store comma-separated relative paths of uploaded drawings/documents
             $table->text('drawing_urls')->nullable()->after('notes')
-                  ->comment('JSON array of uploaded drawing/document paths');
+                ->comment('JSON array of uploaded drawing/document paths');
         });
     }
 

@@ -23,15 +23,15 @@ class RolePermissionSeeder extends Seeder
         // -------------------------------------------------------------------------
         for ($i = 1; $i <= 8; $i++) {
             $permissions[] = [
-                'role_id'     => 1,
-                'module_id'   => $i,
-                'can_access'  => true,
-                'can_view'    => true,
-                'can_create'  => true,
-                'can_edit'    => true,
-                'can_delete'  => true,
-                'created_at'  => now(),
-                'updated_at'  => now(),
+                'role_id' => 1,
+                'module_id' => $i,
+                'can_access' => true,
+                'can_view' => true,
+                'can_create' => true,
+                'can_edit' => true,
+                'can_delete' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
             ];
         }
 
@@ -40,15 +40,15 @@ class RolePermissionSeeder extends Seeder
         // -------------------------------------------------------------------------
         for ($i = 1; $i <= 8; $i++) {
             $permissions[] = [
-                'role_id'     => 2,
-                'module_id'   => $i,
-                'can_access'  => true,
-                'can_view'    => true,
-                'can_create'  => true,
-                'can_edit'    => true,
-                'can_delete'  => true,
-                'created_at'  => now(),
-                'updated_at'  => now(),
+                'role_id' => 2,
+                'module_id' => $i,
+                'can_access' => true,
+                'can_view' => true,
+                'can_create' => true,
+                'can_edit' => true,
+                'can_delete' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
             ];
         }
 
@@ -57,75 +57,75 @@ class RolePermissionSeeder extends Seeder
         // -------------------------------------------------------------------------
         // 1. Dashboard (Read only)
         $permissions[] = [
-            'role_id'     => 3,
-            'module_id'   => 1,
-            'can_access'  => true,
-            'can_view'    => true,
-            'can_create'  => false,
-            'can_edit'    => false,
-            'can_delete'  => false,
-            'created_at'  => now(),
-            'updated_at'  => now(),
+            'role_id' => 3,
+            'module_id' => 1,
+            'can_access' => true,
+            'can_view' => true,
+            'can_create' => false,
+            'can_edit' => false,
+            'can_delete' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
         ];
         // 2. Workspace Management (Read only to list & view assigned workspaces)
         $permissions[] = [
-            'role_id'     => 3,
-            'module_id'   => 2,
-            'can_access'  => true,
-            'can_view'    => true,
-            'can_create'  => false,
-            'can_edit'    => false,
-            'can_delete'  => false,
-            'created_at'  => now(),
-            'updated_at'  => now(),
+            'role_id' => 3,
+            'module_id' => 2,
+            'can_access' => true,
+            'can_view' => true,
+            'can_create' => false,
+            'can_edit' => false,
+            'can_delete' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
         ];
         // 3. Vendor Management (Read only)
         $permissions[] = [
-            'role_id'     => 3,
-            'module_id'   => 3,
-            'can_access'  => true,
-            'can_view'    => true,
-            'can_create'  => false,
-            'can_edit'    => false,
-            'can_delete'  => false,
-            'created_at'  => now(),
-            'updated_at'  => now(),
+            'role_id' => 3,
+            'module_id' => 3,
+            'can_access' => true,
+            'can_view' => true,
+            'can_create' => false,
+            'can_edit' => false,
+            'can_delete' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
         ];
         // 4. Job Orders (Access, View, Edit status)
         $permissions[] = [
-            'role_id'     => 3,
-            'module_id'   => 4,
-            'can_access'  => true,
-            'can_view'    => true,
-            'can_create'  => false,
-            'can_edit'    => true, // to update WIP/Ready status
-            'can_delete'  => false,
-            'created_at'  => now(),
-            'updated_at'  => now(),
+            'role_id' => 3,
+            'module_id' => 4,
+            'can_access' => true,
+            'can_view' => true,
+            'can_create' => false,
+            'can_edit' => true, // to update WIP/Ready status
+            'can_delete' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
         ];
         // 5. Delivery Challans (Access, View, Edit to acknowledge receipt)
         $permissions[] = [
-            'role_id'     => 3,
-            'module_id'   => 5,
-            'can_access'  => true,
-            'can_view'    => true,
-            'can_create'  => false,
-            'can_edit'    => true, // to scan/acknowledge receipt
-            'can_delete'  => false,
-            'created_at'  => now(),
-            'updated_at'  => now(),
+            'role_id' => 3,
+            'module_id' => 5,
+            'can_access' => true,
+            'can_view' => true,
+            'can_create' => false,
+            'can_edit' => true, // to scan/acknowledge receipt
+            'can_delete' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
         ];
         // 6. Quality Rejections (Access, View, Edit to acknowledge quality rejections)
         $permissions[] = [
-            'role_id'     => 3,
-            'module_id'   => 6,
-            'can_access'  => true,
-            'can_view'    => true,
-            'can_create'  => false,
-            'can_edit'    => true, // to acknowledge rejections
-            'can_delete'  => false,
-            'created_at'  => now(),
-            'updated_at'  => now(),
+            'role_id' => 3,
+            'module_id' => 6,
+            'can_access' => true,
+            'can_view' => true,
+            'can_create' => false,
+            'can_edit' => true, // to acknowledge rejections
+            'can_delete' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
         ];
 
         // Bulk insert

@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Job;
 
-use App\Http\Controllers\Controller;
 use App\Helpers\HelperFunction;
+use App\Http\Controllers\Controller;
 use App\Models\Job\DrawingExtractedSpec;
 use App\Models\Workspace\Workspace;
 use App\Services\DrawingSpecExtractionService;
@@ -29,7 +29,7 @@ class DrawingSpecController extends Controller
         try {
             $validation = Validator::make($request->all(), [
                 'workspace_id' => 'nullable|integer',
-                'drawing'      => 'nullable|file|mimes:pdf,jpg,jpeg,png,webp|max:10240',
+                'drawing' => 'nullable|file|mimes:pdf,jpg,jpeg,png,webp|max:10240',
                 'drawing_path' => 'nullable|string',
             ]);
 
@@ -54,7 +54,7 @@ class DrawingSpecController extends Controller
                 })->first();
             }
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'Workspace access denied', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -66,28 +66,28 @@ class DrawingSpecController extends Controller
                 $file = $request->file('drawing');
                 $originalName = $file->getClientOriginalName();
                 $storedPath = $file->store('drawings', 'public');
-                $localFilePath = storage_path('app/public/' . $storedPath);
-                $filePath = asset('storage/' . $storedPath);
+                $localFilePath = storage_path('app/public/'.$storedPath);
+                $filePath = asset('storage/'.$storedPath);
             }
 
-            if (!$filePath) {
+            if (! $filePath) {
                 return HelperFunction::response(null, null, 'Drawing file or path is required for extraction', 'error', '001', Response::HTTP_BAD_REQUEST);
             }
 
             $extracted = $this->extractionService->extractSpecs($filePath, $localFilePath, $originalName);
 
             $record = DrawingExtractedSpec::create([
-                'workspace_id'      => $workspace->id,
-                'drawing_path'      => $filePath,
-                'extracted_specs'   => $extracted['extracted_specs'],
+                'workspace_id' => $workspace->id,
+                'drawing_path' => $filePath,
+                'extracted_specs' => $extracted['extracted_specs'],
                 'confidence_scores' => $extracted['confidence_scores'],
-                'status'            => 'extracted',
-                'extracted_at'      => Carbon::now(),
+                'status' => 'extracted',
+                'extracted_at' => Carbon::now(),
             ]);
 
             return HelperFunction::response($record, null, 'Drawing specs extracted successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to extract drawing specs: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to extract drawing specs: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

@@ -2,15 +2,16 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\Http\Controllers\Controller;
 use App\Helpers\HelperFunction;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
-use Symfony\Component\HttpFoundation\Response;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\Controller;
 use App\Models\User\User;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
+use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class AuthController extends Controller
 {
@@ -27,12 +28,12 @@ class AuthController extends Controller
             }
 
             $validation = Validator::make($request->all(), [
-                'name'     => 'required|string|max:255',
-                'email'    => 'required|string|email|unique:users,email',
-                'phone'    => 'nullable|string|max:20',
-                'gender'   => 'nullable|integer|in:1,2,3',   // 1-Male, 2-Female, 3-Other
+                'name' => 'required|string|max:255',
+                'email' => 'required|string|email|unique:users,email',
+                'phone' => 'nullable|string|max:20',
+                'gender' => 'nullable|integer|in:1,2,3',   // 1-Male, 2-Female, 3-Other
                 'password' => 'required|string|min:8',
-                'role_id'  => 'nullable|integer|in:1,2,3',   // 1-Admin, 2-Principal, 3-Vendor
+                'role_id' => 'nullable|integer|in:1,2,3',   // 1-Admin, 2-Principal, 3-Vendor
             ]);
 
             if ($validation->fails()) {
@@ -50,36 +51,36 @@ class AuthController extends Controller
 
             $result = DB::transaction(function () use ($data) {
                 $user = User::create([
-                    'name'     => $data['name'],
-                    'email'    => $data['email'],
-                    'phone'    => $data['phone'] ?? null,
-                    'gender'   => $data['gender'] ?? null,
+                    'name' => $data['name'],
+                    'email' => $data['email'],
+                    'phone' => $data['phone'] ?? null,
+                    'gender' => $data['gender'] ?? null,
                     'password' => $data['password'],
-                    'role_id'  => $data['role_id'] ?? User::ROLE_PRINCIPAL,
-                    'status'   => User::STATUS_PASSWORD_UNCHANGED,
+                    'role_id' => $data['role_id'] ?? User::ROLE_PRINCIPAL,
+                    'status' => User::STATUS_PASSWORD_UNCHANGED,
                 ]);
 
                 $token = $user->createToken('auth_token')->plainTextToken;
 
                 return [
-                    'user'         => $user->toArray(),
+                    'user' => $user->toArray(),
                     'access_token' => $token,
                 ];
             });
 
             return response(json_encode([
-                'status'    => 'success',
-                'message'   => 'User registered successfully',
-                'code'      => '000',
-                'data'      => $result,
-                'mac'       => null,
+                'status' => 'success',
+                'message' => 'User registered successfully',
+                'code' => '000',
+                'data' => $result,
+                'mac' => null,
                 'timestamp' => now()->toIso8601String(),
             ]), 201)->header('Content-Type', 'application/json');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return response()->json([
-                'status'  => 'error',
+                'status' => 'error',
                 'message' => $e->getMessage(),
-                'code'    => '500',
+                'code' => '500',
             ], 500);
         }
     }
@@ -97,7 +98,7 @@ class AuthController extends Controller
             }
 
             $validation = Validator::make($request->all(), [
-                'email'    => 'required|string|email',
+                'email' => 'required|string|email',
                 'password' => 'required|string',
             ]);
 
@@ -114,7 +115,7 @@ class AuthController extends Controller
 
             $user = User::where('email', $request->input('email'))->first();
 
-            if (!$user || !Hash::check($request->input('password'), $user->password)) {
+            if (! $user || ! Hash::check($request->input('password'), $user->password)) {
                 return HelperFunction::response(
                     null,
                     null,
@@ -150,23 +151,23 @@ class AuthController extends Controller
             $token = $user->createToken('auth_token')->plainTextToken;
 
             return response()->json([
-                'status'    => 'success',
-                'message'   => 'Login successful',
-                'code'      => '000',
-                'data'      => [
-                    'user'                     => $user->toArray(),
-                    'access_token'             => $token,
+                'status' => 'success',
+                'message' => 'Login successful',
+                'code' => '000',
+                'data' => [
+                    'user' => $user->toArray(),
+                    'access_token' => $token,
                     'password_change_required' => $user->isPasswordUnchanged(),
                 ],
-                'mac'       => null,
+                'mac' => null,
                 'timestamp' => now()->toIso8601String(),
             ], 200);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return response()->json([
-                'status'  => 'error',
+                'status' => 'error',
                 'message' => $e->getMessage(),
-                'file'    => $e->getFile() . ':' . $e->getLine(),
-                'code'    => '500',
+                'file' => $e->getFile().':'.$e->getLine(),
+                'code' => '500',
             ], 500);
         }
     }
@@ -212,13 +213,13 @@ class AuthController extends Controller
     public function changePassword(Request $request)
     {
         $validation = Validator::make($request->all(), [
-            'current_password'  => 'required|string',
-            'new_password'      => 'required|string|min:8|different:current_password',
-            'confirm_password'  => 'required|string|same:new_password',
+            'current_password' => 'required|string',
+            'new_password' => 'required|string|min:8|different:current_password',
+            'confirm_password' => 'required|string|same:new_password',
         ], [
-            'new_password.min'              => 'New password must be at least 8 characters.',
-            'new_password.different'        => 'New password must be different from your current password.',
-            'confirm_password.same'         => 'Passwords do not match.',
+            'new_password.min' => 'New password must be at least 8 characters.',
+            'new_password.different' => 'New password must be different from your current password.',
+            'confirm_password.same' => 'Passwords do not match.',
         ]);
 
         if ($validation->fails()) {
@@ -231,7 +232,7 @@ class AuthController extends Controller
 
         $user = $request->user();
 
-        if (!Hash::check($request->input('current_password'), $user->password)) {
+        if (! Hash::check($request->input('current_password'), $user->password)) {
             return HelperFunction::response(
                 null, null,
                 'Current password is incorrect.',
@@ -241,7 +242,7 @@ class AuthController extends Controller
 
         $user->update([
             'password' => Hash::make($request->input('new_password')),
-            'status'   => User::STATUS_ACTIVE,
+            'status' => User::STATUS_ACTIVE,
         ]);
 
         return HelperFunction::response(
@@ -262,7 +263,7 @@ class AuthController extends Controller
                 'email' => 'required|email',
             ], [
                 'email.required' => 'Email address is required.',
-                'email.email'    => 'Please enter a valid email address.',
+                'email.email' => 'Please enter a valid email address.',
             ]);
 
             if ($validation->fails()) {
@@ -274,9 +275,9 @@ class AuthController extends Controller
             }
 
             $email = strtolower(trim($request->input('email')));
-            $user  = User::where('email', $email)->first();
+            $user = User::where('email', $email)->first();
 
-            if (!$user) {
+            if (! $user) {
                 // Return success anyway to prevent email enumeration
                 return HelperFunction::response(
                     null, null,
@@ -294,10 +295,10 @@ class AuthController extends Controller
             $otp = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
 
             DB::table('password_reset_tokens')->insert([
-                'email'      => $email,
-                'token'      => $otp,
+                'email' => $email,
+                'token' => $otp,
                 'expires_at' => Carbon::now()->addMinutes(15),
-                'used'       => false,
+                'used' => false,
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now(),
             ]);
@@ -310,10 +311,10 @@ class AuthController extends Controller
                 'Reset code generated successfully. In production, this would be sent via SMS/Email.',
                 'success', '000', Response::HTTP_OK
             );
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return HelperFunction::response(
                 null, null,
-                'Failed to process request: ' . $e->getMessage(),
+                'Failed to process request: '.$e->getMessage(),
                 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR
             );
         }
@@ -327,7 +328,7 @@ class AuthController extends Controller
     {
         $validation = Validator::make($request->all(), [
             'email' => 'required|email',
-            'otp'   => 'required|string|size:6',
+            'otp' => 'required|string|size:6',
         ], [
             'otp.size' => 'Reset code must be exactly 6 digits.',
         ]);
@@ -341,7 +342,7 @@ class AuthController extends Controller
         }
 
         $email = strtolower(trim($request->input('email')));
-        $otp   = $request->input('otp');
+        $otp = $request->input('otp');
 
         $record = DB::table('password_reset_tokens')
             ->where('email', $email)
@@ -350,7 +351,7 @@ class AuthController extends Controller
             ->where('expires_at', '>', Carbon::now())
             ->first();
 
-        if (!$record) {
+        if (! $record) {
             return HelperFunction::response(
                 null, null,
                 'Invalid or expired reset code. Please request a new one.',
@@ -373,14 +374,14 @@ class AuthController extends Controller
     {
         try {
             $validation = Validator::make($request->all(), [
-                'email'            => 'required|email',
-                'otp'              => 'required|string|size:6',
-                'new_password'     => 'required|string|min:8',
+                'email' => 'required|email',
+                'otp' => 'required|string|size:6',
+                'new_password' => 'required|string|min:8',
                 'confirm_password' => 'required|string|same:new_password',
             ], [
-                'otp.size'                  => 'Reset code must be exactly 6 digits.',
-                'new_password.min'          => 'New password must be at least 8 characters.',
-                'confirm_password.same'     => 'Passwords do not match.',
+                'otp.size' => 'Reset code must be exactly 6 digits.',
+                'new_password.min' => 'New password must be at least 8 characters.',
+                'confirm_password.same' => 'Passwords do not match.',
             ]);
 
             if ($validation->fails()) {
@@ -392,7 +393,7 @@ class AuthController extends Controller
             }
 
             $email = strtolower(trim($request->input('email')));
-            $otp   = $request->input('otp');
+            $otp = $request->input('otp');
 
             $record = DB::table('password_reset_tokens')
                 ->where('email', $email)
@@ -401,7 +402,7 @@ class AuthController extends Controller
                 ->where('expires_at', '>', Carbon::now())
                 ->first();
 
-            if (!$record) {
+            if (! $record) {
                 return HelperFunction::response(
                     null, null,
                     'Invalid or expired reset code. Please request a new one.',
@@ -410,7 +411,7 @@ class AuthController extends Controller
             }
 
             $user = User::where('email', $email)->first();
-            if (!$user) {
+            if (! $user) {
                 return HelperFunction::response(
                     null, null,
                     'Account not found.',
@@ -426,7 +427,7 @@ class AuthController extends Controller
             // Update user password
             $user->update([
                 'password' => Hash::make($request->input('new_password')),
-                'status'   => User::STATUS_ACTIVE,
+                'status' => User::STATUS_ACTIVE,
             ]);
 
             return HelperFunction::response(
@@ -434,13 +435,12 @@ class AuthController extends Controller
                 'Password reset successfully. You can now sign in with your new password.',
                 'success', '000', Response::HTTP_OK
             );
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return HelperFunction::response(
                 null, null,
-                'Failed to reset password: ' . $e->getMessage(),
+                'Failed to reset password: '.$e->getMessage(),
                 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR
             );
         }
     }
 }
-

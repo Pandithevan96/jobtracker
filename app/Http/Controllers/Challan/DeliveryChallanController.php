@@ -2,22 +2,24 @@
 
 namespace App\Http\Controllers\Challan;
 
-use App\Http\Controllers\Controller;
 use App\Helpers\HelperFunction;
-use App\Models\Challan\DeliveryChallan;
+use App\Http\Controllers\Controller;
 use App\Models\Challan\ChallanItem;
+use App\Models\Challan\DeliveryChallan;
 use App\Models\Job\JobOrder;
-use App\Models\Workspace\Workspace;
 use App\Models\Vendor\Vendor;
+use App\Models\Workspace\Workspace;
 use App\Services\NotificationService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Exception;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
-use Barryvdh\DomPDF\Facade\Pdf;
+use Throwable;
 
 /**
  * --------------------------------------------------------------------------------
@@ -34,9 +36,10 @@ use Barryvdh\DomPDF\Facade\Pdf;
  *   POST /api/v1/challans/acknowledge  — Vendor marks as received (can_edit)
  *   POST /api/v1/challans/cancel       — Principal cancels the challan (can_delete)
  *
- * @package App\Http\Controllers\Challan
  * @author  Development Team
+ *
  * @version 1.0.0
+ *
  * @since   2026-07-03
  * --------------------------------------------------------------------------------
  */
@@ -64,7 +67,7 @@ class DeliveryChallanController extends Controller
         return Workspace::where('id', $workspaceId)
             ->where(function ($q) use ($user) {
                 $q->where('owner_id', $user->id)
-                  ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                    ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
             })
             ->first();
     }
@@ -78,58 +81,59 @@ class DeliveryChallanController extends Controller
      * Create a new Delivery Challan with line items.
      * POST /api/v1/challans/create
      * --------------------------------------------------------------------------------
-     * @param  Request $request
-     *   workspace_id*       int
-     *   job_order_id*       int
-     *   vendor_id*          int
-     *   type*               int  1-Outward, 2-Inward
-     *   dispatch_date       date
-     *   estimated_delivery  date
-     *   vehicle_number      string
-     *   driver_name         string
-     *   notes               string
-     *   items*              array
-     *     items.*.part_name*   string
-     *     items.*.part_number  string
-     *     items.*.hsn_code     string
-     *     items.*.quantity*    numeric
-     *     items.*.uom          string
-     *     items.*.unit_value   numeric
-     *     items.*.description  string
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
+     *
+     * @param  Request  $request
+     *                            workspace_id*       int
+     *                            job_order_id*       int
+     *                            vendor_id*          int
+     *                            type*               int  1-Outward, 2-Inward
+     *                            dispatch_date       date
+     *                            estimated_delivery  date
+     *                            vehicle_number      string
+     *                            driver_name         string
+     *                            notes               string
+     *                            items*              array
+     *                            items.*.part_name*   string
+     *                            items.*.part_number  string
+     *                            items.*.hsn_code     string
+     *                            items.*.quantity*    numeric
+     *                            items.*.uom          string
+     *                            items.*.unit_value   numeric
+     *                            items.*.description  string
+     * @return JsonResponse
+     *                      --------------------------------------------------------------------------------
      */
     public function store(Request $request)
     {
         try {
             // Check permission
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_create) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_create) {
                 return HelperFunction::response(null, null, 'You do not have permission to create delivery challans', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             $validation = Validator::make($request->all(), [
-                'workspace_id'        => 'required|integer|exists:workspaces,id',
-                'job_order_id'        => 'required|integer|exists:job_orders,id',
-                'vendor_id'           => 'required|integer|exists:vendors,id',
-                'parent_challan_id'   => 'nullable|integer|exists:delivery_challans,id',
-                'type'                => 'required|integer|in:1,2', // 1-Outward, 2-Inward
+                'workspace_id' => 'required|integer|exists:workspaces,id',
+                'job_order_id' => 'required|integer|exists:job_orders,id',
+                'vendor_id' => 'required|integer|exists:vendors,id',
+                'parent_challan_id' => 'nullable|integer|exists:delivery_challans,id',
+                'type' => 'required|integer|in:1,2', // 1-Outward, 2-Inward
                 'purpose_of_movement' => 'nullable|string|max:255',
-                'vendor_dc_number'    => 'nullable|string|max:50',
-                'dispatch_date'       => 'nullable|date',
-                'estimated_delivery'  => 'nullable|date|after_or_equal:dispatch_date',
-                'vehicle_number'      => 'nullable|string|max:20',
-                'eway_bill_number'    => 'nullable|string|max:50',
-                'driver_name'         => 'nullable|string|max:100',
-                'transporter_id'      => 'nullable|string|max:50',
-                'notes'               => 'nullable|string',
-                'items'               => 'required|array|min:1',
-                'items.*.part_name'   => 'required|string|max:255',
+                'vendor_dc_number' => 'nullable|string|max:50',
+                'dispatch_date' => 'nullable|date',
+                'estimated_delivery' => 'nullable|date|after_or_equal:dispatch_date',
+                'vehicle_number' => 'nullable|string|max:20',
+                'eway_bill_number' => 'nullable|string|max:50',
+                'driver_name' => 'nullable|string|max:100',
+                'transporter_id' => 'nullable|string|max:50',
+                'notes' => 'nullable|string',
+                'items' => 'required|array|min:1',
+                'items.*.part_name' => 'required|string|max:255',
                 'items.*.part_number' => 'nullable|string|max:100',
-                'items.*.hsn_code'    => 'nullable|string|max:20',
-                'items.*.quantity'    => 'required|numeric|min:0.01',
-                'items.*.uom'         => 'nullable|string|max:20',
-                'items.*.unit_value'  => 'nullable|numeric|min:0',
+                'items.*.hsn_code' => 'nullable|string|max:20',
+                'items.*.quantity' => 'required|numeric|min:0.01',
+                'items.*.uom' => 'nullable|string|max:20',
+                'items.*.unit_value' => 'nullable|numeric|min:0',
                 'items.*.description' => 'nullable|string',
             ]);
 
@@ -142,7 +146,7 @@ class DeliveryChallanController extends Controller
 
             // Workspace scope
             $workspace = $this->resolveWorkspace($workspaceId, $user);
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'Workspace not found or you do not belong to it', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -156,7 +160,7 @@ class DeliveryChallanController extends Controller
                 if ($dcThisMonth >= self::FREE_PLAN_MONTHLY_LIMIT) {
                     return HelperFunction::response(
                         null, null,
-                        'Free plan allows maximum ' . self::FREE_PLAN_MONTHLY_LIMIT . ' delivery challans per month. Please upgrade.',
+                        'Free plan allows maximum '.self::FREE_PLAN_MONTHLY_LIMIT.' delivery challans per month. Please upgrade.',
                         'error', '004', Response::HTTP_FORBIDDEN
                     );
                 }
@@ -167,7 +171,7 @@ class DeliveryChallanController extends Controller
                 ->where('workspace_id', $workspaceId)
                 ->first();
 
-            if (!$jobOrder) {
+            if (! $jobOrder) {
                 return HelperFunction::response(null, null, 'Job order not found in this workspace', 'error', '003', Response::HTTP_NOT_FOUND);
             }
 
@@ -176,7 +180,7 @@ class DeliveryChallanController extends Controller
                 ->where('workspace_id', $workspaceId)
                 ->first();
 
-            if (!$vendor) {
+            if (! $vendor) {
                 return HelperFunction::response(null, null, 'Vendor not found in this workspace', 'error', '003', Response::HTTP_NOT_FOUND);
             }
 
@@ -184,39 +188,39 @@ class DeliveryChallanController extends Controller
             DB::beginTransaction();
 
             $challan = DeliveryChallan::create([
-                'workspace_id'        => $workspaceId,
-                'job_order_id'        => $jobOrder->id,
-                'vendor_id'           => $vendor->id,
-                'parent_challan_id'   => $request->input('parent_challan_id'),
-                'created_by'          => $user->id,
-                'type'                => $request->input('type'),
+                'workspace_id' => $workspaceId,
+                'job_order_id' => $jobOrder->id,
+                'vendor_id' => $vendor->id,
+                'parent_challan_id' => $request->input('parent_challan_id'),
+                'created_by' => $user->id,
+                'type' => $request->input('type'),
                 'purpose_of_movement' => $request->input('purpose_of_movement', ($request->input('type') == 1 ? 'Sent for job work under Rule 55' : 'Returned after job work under Rule 55')),
-                'vendor_dc_number'    => $request->input('vendor_dc_number'),
-                'status'              => DeliveryChallan::STATUS_ISSUED,
-                'dispatch_date'       => $request->input('dispatch_date'),
-                'estimated_delivery'  => $request->input('estimated_delivery'),
-                'vehicle_number'      => $request->input('vehicle_number'),
-                'eway_bill_number'    => $request->input('eway_bill_number'),
-                'driver_name'         => $request->input('driver_name'),
-                'transporter_id'      => $request->input('transporter_id'),
-                'notes'               => $request->input('notes'),
+                'vendor_dc_number' => $request->input('vendor_dc_number'),
+                'status' => DeliveryChallan::STATUS_ISSUED,
+                'dispatch_date' => $request->input('dispatch_date'),
+                'estimated_delivery' => $request->input('estimated_delivery'),
+                'vehicle_number' => $request->input('vehicle_number'),
+                'eway_bill_number' => $request->input('eway_bill_number'),
+                'driver_name' => $request->input('driver_name'),
+                'transporter_id' => $request->input('transporter_id'),
+                'notes' => $request->input('notes'),
             ]);
 
             foreach ($request->input('items') as $item) {
-                $unitValue  = (float) ($item['unit_value'] ?? 0);
-                $quantity   = (float) $item['quantity'];
+                $unitValue = (float) ($item['unit_value'] ?? 0);
+                $quantity = (float) $item['quantity'];
                 $totalValue = $unitValue * $quantity;
 
                 ChallanItem::create([
-                    'challan_id'   => $challan->id,
-                    'part_name'    => $item['part_name'],
-                    'part_number'  => $item['part_number'] ?? null,
-                    'hsn_code'     => $item['hsn_code'] ?? null,
-                    'quantity'     => $quantity,
-                    'uom'          => $item['uom'] ?? 'Nos',
-                    'unit_value'   => $unitValue,
-                    'total_value'  => $totalValue,
-                    'description'  => $item['description'] ?? null,
+                    'challan_id' => $challan->id,
+                    'part_name' => $item['part_name'],
+                    'part_number' => $item['part_number'] ?? null,
+                    'hsn_code' => $item['hsn_code'] ?? null,
+                    'quantity' => $quantity,
+                    'uom' => $item['uom'] ?? 'Nos',
+                    'unit_value' => $unitValue,
+                    'total_value' => $totalValue,
+                    'description' => $item['description'] ?? null,
                 ]);
             }
 
@@ -230,7 +234,8 @@ class DeliveryChallanController extends Controller
             return HelperFunction::response($challan, null, 'Delivery Challan created successfully', 'success', '000', Response::HTTP_CREATED);
         } catch (Exception $e) {
             DB::rollBack();
-            return HelperFunction::response(null, null, 'Failed to create delivery challan: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+
+            return HelperFunction::response(null, null, 'Failed to create delivery challan: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -239,23 +244,24 @@ class DeliveryChallanController extends Controller
      * List Delivery Challans in a workspace.
      * POST /api/v1/challans/list
      * --------------------------------------------------------------------------------
-     * @param  Request $request  workspace_id*, status, vendor_id, type, job_order_id
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
+     *
+     * @param  Request  $request  workspace_id*, status, vendor_id, type, job_order_id
+     * @return JsonResponse
+     *                      --------------------------------------------------------------------------------
      */
     public function list(Request $request)
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_view) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_view) {
                 return HelperFunction::response(null, null, 'You do not have permission to view delivery challans', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             $validation = Validator::make($request->all(), [
                 'workspace_id' => 'nullable|integer',
-                'status'       => 'nullable|integer|in:1,2,3,4,5',
-                'vendor_id'    => 'nullable|integer',
-                'type'         => 'nullable|integer|in:1,2',
+                'status' => 'nullable|integer|in:1,2,3,4,5',
+                'vendor_id' => 'nullable|integer',
+                'type' => 'nullable|integer|in:1,2',
                 'job_order_id' => 'nullable|integer',
             ]);
 
@@ -268,17 +274,17 @@ class DeliveryChallanController extends Controller
 
             $workspace = null;
             if ($workspaceId) {
-                $workspace = $this->resolveWorkspace((int)$workspaceId, $user);
+                $workspace = $this->resolveWorkspace((int) $workspaceId, $user);
             }
 
-            if (!$workspace) {
+            if (! $workspace) {
                 $workspace = Workspace::where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })->first();
             }
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response([], null, 'Delivery Challans fetched successfully', 'success', '000', Response::HTTP_OK);
             }
 
@@ -286,8 +292,12 @@ class DeliveryChallanController extends Controller
 
             $myVendorIds = Vendor::where('user_id', $user->id)
                 ->orWhere(function ($q) use ($user) {
-                    if ($user->email) $q->where('email', $user->email);
-                    if ($user->phone) $q->orWhere('phone', $user->phone);
+                    if ($user->email) {
+                        $q->where('email', $user->email);
+                    }
+                    if ($user->phone) {
+                        $q->orWhere('phone', $user->phone);
+                    }
                 })
                 ->pluck('id');
 
@@ -322,7 +332,7 @@ class DeliveryChallanController extends Controller
 
             // Vendor users see only their own challans
             if ($user->isVendor()) {
-                $query->whereHas('vendor', function ($q) use ($user) {
+                $query->whereHas('vendor', function ($q) {
                     // Vendors scoped to challans for their workspace vendor profile
                     // (workspace_id already filters; no extra restriction needed as Vendor users
                     //  are workspace members for a specific vendor)
@@ -333,7 +343,7 @@ class DeliveryChallanController extends Controller
 
             return HelperFunction::response($challans, null, 'Delivery Challans fetched successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to list delivery challans: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to list delivery challans: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -342,15 +352,16 @@ class DeliveryChallanController extends Controller
      * Get detailed view of a single Delivery Challan.
      * POST /api/v1/challans/details
      * --------------------------------------------------------------------------------
-     * @param  Request $request  id*
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
+     *
+     * @param  Request  $request  id*
+     * @return JsonResponse
+     *                      --------------------------------------------------------------------------------
      */
     public function details(Request $request)
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_view) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_view) {
                 return HelperFunction::response(null, null, 'You do not have permission to view delivery challan details', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -367,13 +378,13 @@ class DeliveryChallanController extends Controller
                 ->find($request->input('id'));
 
             $workspace = $this->resolveWorkspace($challan->workspace_id, $user);
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'You do not have access to this challan', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             return HelperFunction::response($challan, null, 'Delivery Challan details fetched successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to get challan details: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to get challan details: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -382,20 +393,21 @@ class DeliveryChallanController extends Controller
      * Vendor acknowledges receipt of a Delivery Challan.
      * POST /api/v1/challans/acknowledge
      * --------------------------------------------------------------------------------
-     * @param  Request $request  id*, notes
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
+     *
+     * @param  Request  $request  id*, notes
+     * @return JsonResponse
+     *                      --------------------------------------------------------------------------------
      */
     public function acknowledge(Request $request)
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_edit) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_edit) {
                 return HelperFunction::response(null, null, 'You do not have permission to acknowledge delivery challans', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             $validation = Validator::make($request->all(), [
-                'id'    => 'required|integer|exists:delivery_challans,id',
+                'id' => 'required|integer|exists:delivery_challans,id',
                 'notes' => 'nullable|string',
             ]);
 
@@ -407,20 +419,20 @@ class DeliveryChallanController extends Controller
             $challan = DeliveryChallan::find($request->input('id'));
 
             $workspace = $this->resolveWorkspace($challan->workspace_id, $user);
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'You do not have access to this challan', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             // Only Issued or Dispatched challans can be acknowledged
-            if (!in_array($challan->status, [DeliveryChallan::STATUS_ISSUED, DeliveryChallan::STATUS_DISPATCHED])) {
+            if (! in_array($challan->status, [DeliveryChallan::STATUS_ISSUED, DeliveryChallan::STATUS_DISPATCHED])) {
                 return HelperFunction::response(null, null, 'Only issued or dispatched challans can be acknowledged', 'error', '004', Response::HTTP_UNPROCESSABLE_ENTITY);
             }
 
             $challan->update([
-                'status'          => DeliveryChallan::STATUS_ACKNOWLEDGED,
+                'status' => DeliveryChallan::STATUS_ACKNOWLEDGED,
                 'acknowledged_at' => now(),
                 'acknowledged_by' => $user->id,
-                'notes'           => $request->input('notes', $challan->notes),
+                'notes' => $request->input('notes', $challan->notes),
             ]);
 
             // Dispatch challan acknowledged notification to principal
@@ -428,7 +440,7 @@ class DeliveryChallanController extends Controller
 
             return HelperFunction::response($challan->fresh(), null, 'Delivery Challan acknowledged successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to acknowledge challan: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to acknowledge challan: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -437,20 +449,21 @@ class DeliveryChallanController extends Controller
      * Cancel a Delivery Challan (Principal only).
      * POST /api/v1/challans/cancel
      * --------------------------------------------------------------------------------
-     * @param  Request $request  id*, reason
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
+     *
+     * @param  Request  $request  id*, reason
+     * @return JsonResponse
+     *                      --------------------------------------------------------------------------------
      */
     public function cancel(Request $request)
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_delete) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_delete) {
                 return HelperFunction::response(null, null, 'You do not have permission to cancel delivery challans', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             $validation = Validator::make($request->all(), [
-                'id'     => 'required|integer|exists:delivery_challans,id',
+                'id' => 'required|integer|exists:delivery_challans,id',
                 'reason' => 'nullable|string',
             ]);
 
@@ -462,7 +475,7 @@ class DeliveryChallanController extends Controller
             $challan = DeliveryChallan::find($request->input('id'));
 
             $workspace = $this->resolveWorkspace($challan->workspace_id, $user);
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'You do not have access to this challan', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -473,7 +486,7 @@ class DeliveryChallanController extends Controller
 
             $challan->update([
                 'status' => DeliveryChallan::STATUS_CANCELLED,
-                'notes'  => $request->input('reason', $challan->notes),
+                'notes' => $request->input('reason', $challan->notes),
             ]);
 
             // Decrement monthly counter since the DC was cancelled
@@ -481,7 +494,7 @@ class DeliveryChallanController extends Controller
 
             return HelperFunction::response($challan->fresh(), null, 'Delivery Challan cancelled successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to cancel challan: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to cancel challan: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -492,15 +505,15 @@ class DeliveryChallanController extends Controller
      * --------------------------------------------------------------------------------
      * Renders challan_pdf.blade.php, saves to public storage, returns download URL.
      *
-     * @param  Request $request  id*
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
+     * @param  Request  $request  id*
+     * @return JsonResponse
+     *                      --------------------------------------------------------------------------------
      */
     public function downloadPdf(Request $request)
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_view) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_view) {
                 return HelperFunction::response(null, null, 'You do not have permission to export delivery challans', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -516,29 +529,29 @@ class DeliveryChallanController extends Controller
             $challan = DeliveryChallan::with(['items', 'vendor', 'jobOrder'])->find($request->input('id'));
 
             $workspace = $this->resolveWorkspace($challan->workspace_id, $user);
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'You do not have access to this challan', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             // Generate PDF from Blade view
             $pdf = Pdf::loadView('challan_pdf', [
-                'challan'   => $challan,
+                'challan' => $challan,
                 'workspace' => $workspace,
             ])->setPaper('a4', 'portrait');
 
             // Save to public storage (requires storage:link to be run once)
-            $dcNumber = $challan->challan_number ?: ('DC_' . str_pad($challan->id, 4, '0', STR_PAD_LEFT));
-            $fileName = $dcNumber . '.pdf';
+            $dcNumber = $challan->challan_number ?: ('DC_'.str_pad($challan->id, 4, '0', STR_PAD_LEFT));
+            $fileName = $dcNumber.'.pdf';
             $base64Pdf = base64_encode($pdf->output());
 
             return HelperFunction::response([
-                'file_name'  => $fileName,
-                'base64_pdf' => 'data:application/pdf;base64,' . $base64Pdf,
-                'stream_url' => url('api/v1/challans/pdf/' . $challan->id),
+                'file_name' => $fileName,
+                'base64_pdf' => 'data:application/pdf;base64,'.$base64Pdf,
+                'stream_url' => url('api/v1/challans/pdf/'.$challan->id),
             ], null, 'PDF generated successfully', 'success', '000', Response::HTTP_OK);
 
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to generate challan PDF: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to generate challan PDF: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -550,24 +563,26 @@ class DeliveryChallanController extends Controller
     {
         try {
             $challan = DeliveryChallan::with(['items', 'vendor', 'jobOrder'])->find($id);
-            if (!$challan) abort(404, 'Delivery Challan not found');
+            if (! $challan) {
+                abort(404, 'Delivery Challan not found');
+            }
 
             $workspace = Workspace::find($challan->workspace_id);
 
             $pdf = Pdf::loadView('challan_pdf', [
-                'challan'   => $challan,
+                'challan' => $challan,
                 'workspace' => $workspace,
             ])->setPaper('a4', 'portrait');
 
-            $dcNumber = $challan->challan_number ?: ('DC_' . str_pad($challan->id, 4, '0', STR_PAD_LEFT));
-            $fileName = $dcNumber . '.pdf';
+            $dcNumber = $challan->challan_number ?: ('DC_'.str_pad($challan->id, 4, '0', STR_PAD_LEFT));
+            $fileName = $dcNumber.'.pdf';
 
             return response($pdf->output(), 200, [
-                'Content-Type'        => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="'.$fileName.'"',
             ]);
-        } catch (\Throwable $e) {
-            return response()->json(['status' => 'error', 'message' => 'Error generating PDF: ' . $e->getMessage()], 500);
+        } catch (Throwable $e) {
+            return response()->json(['status' => 'error', 'message' => 'Error generating PDF: '.$e->getMessage()], 500);
         }
     }
 
@@ -576,47 +591,48 @@ class DeliveryChallanController extends Controller
      * Update an existing Delivery Challan with line items (Issued state only).
      * POST /api/v1/challans/update
      * --------------------------------------------------------------------------------
-     * @param  Request $request
-     *   id*                 int
-     *   dispatch_date       date
-     *   estimated_delivery  date
-     *   vehicle_number      string
-     *   driver_name         string
-     *   notes               string
-     *   items*              array
-     *     items.*.part_name*   string
-     *     items.*.part_number  string
-     *     items.*.hsn_code     string
-     *     items.*.quantity*    numeric
-     *     items.*.uom          string
-     *     items.*.unit_value   numeric
-     *     items.*.description  string
-     * @return \Illuminate\Http\JsonResponse
-     * --------------------------------------------------------------------------------
+     *
+     * @param  Request  $request
+     *                            id*                 int
+     *                            dispatch_date       date
+     *                            estimated_delivery  date
+     *                            vehicle_number      string
+     *                            driver_name         string
+     *                            notes               string
+     *                            items*              array
+     *                            items.*.part_name*   string
+     *                            items.*.part_number  string
+     *                            items.*.hsn_code     string
+     *                            items.*.quantity*    numeric
+     *                            items.*.uom          string
+     *                            items.*.unit_value   numeric
+     *                            items.*.description  string
+     * @return JsonResponse
+     *                      --------------------------------------------------------------------------------
      */
     public function update(Request $request)
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_edit) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_edit) {
                 return HelperFunction::response(null, null, 'You do not have permission to edit delivery challans', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             $validation = Validator::make($request->all(), [
-                'id'                 => 'required|integer|exists:delivery_challans,id',
-                'dispatch_date'      => 'nullable|date',
+                'id' => 'required|integer|exists:delivery_challans,id',
+                'dispatch_date' => 'nullable|date',
                 'estimated_delivery' => 'nullable|date|after_or_equal:dispatch_date',
-                'vehicle_number'     => 'nullable|string|max:20',
-                'driver_name'        => 'nullable|string|max:100',
-                'notes'              => 'nullable|string',
-                'items'              => 'required|array|min:1',
-                'items.*.part_name'  => 'required|string|max:255',
-                'items.*.part_number'=> 'nullable|string|max:100',
-                'items.*.hsn_code'   => 'nullable|string|max:20',
-                'items.*.quantity'   => 'required|numeric|min:0.01',
-                'items.*.uom'        => 'nullable|string|max:20',
+                'vehicle_number' => 'nullable|string|max:20',
+                'driver_name' => 'nullable|string|max:100',
+                'notes' => 'nullable|string',
+                'items' => 'required|array|min:1',
+                'items.*.part_name' => 'required|string|max:255',
+                'items.*.part_number' => 'nullable|string|max:100',
+                'items.*.hsn_code' => 'nullable|string|max:20',
+                'items.*.quantity' => 'required|numeric|min:0.01',
+                'items.*.uom' => 'nullable|string|max:20',
                 'items.*.unit_value' => 'nullable|numeric|min:0',
-                'items.*.description'=> 'nullable|string',
+                'items.*.description' => 'nullable|string',
             ]);
 
             if ($validation->fails()) {
@@ -627,7 +643,7 @@ class DeliveryChallanController extends Controller
             $challan = DeliveryChallan::find($request->input('id'));
 
             $workspace = $this->resolveWorkspace($challan->workspace_id, $user);
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'You do not have access to this challan', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -639,31 +655,31 @@ class DeliveryChallanController extends Controller
             DB::beginTransaction();
 
             $challan->update([
-                'dispatch_date'      => $request->input('dispatch_date'),
+                'dispatch_date' => $request->input('dispatch_date'),
                 'estimated_delivery' => $request->input('estimated_delivery'),
-                'vehicle_number'     => $request->input('vehicle_number'),
-                'driver_name'        => $request->input('driver_name'),
-                'notes'              => $request->input('notes'),
+                'vehicle_number' => $request->input('vehicle_number'),
+                'driver_name' => $request->input('driver_name'),
+                'notes' => $request->input('notes'),
             ]);
 
             // Recreate items to ensure sync matches perfectly
             ChallanItem::where('challan_id', $challan->id)->delete();
 
             foreach ($request->input('items') as $item) {
-                $unitValue  = (float) ($item['unit_value'] ?? 0);
-                $quantity   = (float) $item['quantity'];
+                $unitValue = (float) ($item['unit_value'] ?? 0);
+                $quantity = (float) $item['quantity'];
                 $totalValue = $unitValue * $quantity;
 
                 ChallanItem::create([
-                    'challan_id'   => $challan->id,
-                    'part_name'    => $item['part_name'],
-                    'part_number'  => $item['part_number'] ?? null,
-                    'hsn_code'     => $item['hsn_code'] ?? null,
-                    'quantity'     => $quantity,
-                    'uom'          => $item['uom'] ?? 'Nos',
-                    'unit_value'   => $unitValue,
-                    'total_value'  => $totalValue,
-                    'description'  => $item['description'] ?? null,
+                    'challan_id' => $challan->id,
+                    'part_name' => $item['part_name'],
+                    'part_number' => $item['part_number'] ?? null,
+                    'hsn_code' => $item['hsn_code'] ?? null,
+                    'quantity' => $quantity,
+                    'uom' => $item['uom'] ?? 'Nos',
+                    'unit_value' => $unitValue,
+                    'total_value' => $totalValue,
+                    'description' => $item['description'] ?? null,
                 ]);
             }
 
@@ -674,7 +690,8 @@ class DeliveryChallanController extends Controller
             return HelperFunction::response($challan, null, 'Delivery Challan updated successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
             DB::rollBack();
-            return HelperFunction::response(null, null, 'Failed to update delivery challan: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+
+            return HelperFunction::response(null, null, 'Failed to update delivery challan: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

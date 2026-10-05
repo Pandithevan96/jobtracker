@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('workspaces', function (Blueprint $table) {
-            if (!Schema::hasColumn('workspaces', 'material_loss_tolerance_pct')) {
+            if (! Schema::hasColumn('workspaces', 'material_loss_tolerance_pct')) {
                 $table->decimal('material_loss_tolerance_pct', 5, 2)->default(2.00)->after('dc_count_this_month');
             }
         });

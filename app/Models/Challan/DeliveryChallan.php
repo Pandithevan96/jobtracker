@@ -2,6 +2,10 @@
 
 namespace App\Models\Challan;
 
+use App\Models\Job\JobOrder;
+use App\Models\User\User;
+use App\Models\Vendor\Vendor;
+use App\Models\Workspace\Workspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -12,9 +16,10 @@ use Illuminate\Database\Eloquent\Model;
  * Represents a GST Delivery Challan (DC) issued from Principal to Vendor for
  * job work under Section 143 / Rule 45 of GST Rules.
  *
- * @package App\Models\Challan
  * @author  Development Team
+ *
  * @version 1.0.0
+ *
  * @since   2026-07-03
  * --------------------------------------------------------------------------------
  */
@@ -24,14 +29,19 @@ class DeliveryChallan extends Model
 
     // Challan type constants
     const TYPE_OUTWARD = 1; // Principal → Vendor (material sent for job work)
-    const TYPE_INWARD  = 2; // Vendor → Principal (finished goods returned)
+
+    const TYPE_INWARD = 2; // Vendor → Principal (finished goods returned)
 
     // Status constants
-    const STATUS_ISSUED      = 1;
-    const STATUS_DISPATCHED  = 2;
+    const STATUS_ISSUED = 1;
+
+    const STATUS_DISPATCHED = 2;
+
     const STATUS_ACKNOWLEDGED = 3; // Vendor scanned/received
-    const STATUS_COMPLETED   = 4;
-    const STATUS_CANCELLED   = 5;
+
+    const STATUS_COMPLETED = 4;
+
+    const STATUS_CANCELLED = 5;
 
     /**
      * The table associated with the model.
@@ -74,11 +84,11 @@ class DeliveryChallan extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'type'               => 'integer',
-        'status'             => 'integer',
-        'dispatch_date'      => 'date',
+        'type' => 'integer',
+        'status' => 'integer',
+        'dispatch_date' => 'date',
         'estimated_delivery' => 'date',
-        'acknowledged_at'    => 'datetime',
+        'acknowledged_at' => 'datetime',
     ];
 
     /**
@@ -100,7 +110,7 @@ class DeliveryChallan extends Model
             }
 
             if (empty($challan->qr_code)) {
-                $challan->qr_code = 'QR-' . strtoupper(bin2hex(random_bytes(8)));
+                $challan->qr_code = 'QR-'.strtoupper(bin2hex(random_bytes(8)));
             }
         });
     }
@@ -111,17 +121,17 @@ class DeliveryChallan extends Model
 
     public function workspace()
     {
-        return $this->belongsTo(\App\Models\Workspace\Workspace::class, 'workspace_id');
+        return $this->belongsTo(Workspace::class, 'workspace_id');
     }
 
     public function jobOrder()
     {
-        return $this->belongsTo(\App\Models\Job\JobOrder::class, 'job_order_id');
+        return $this->belongsTo(JobOrder::class, 'job_order_id');
     }
 
     public function vendor()
     {
-        return $this->belongsTo(\App\Models\Vendor\Vendor::class, 'vendor_id');
+        return $this->belongsTo(Vendor::class, 'vendor_id');
     }
 
     public function parentChallan()
@@ -136,12 +146,12 @@ class DeliveryChallan extends Model
 
     public function creator()
     {
-        return $this->belongsTo(\App\Models\User\User::class, 'created_by');
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function acknowledgedBy()
     {
-        return $this->belongsTo(\App\Models\User\User::class, 'acknowledged_by');
+        return $this->belongsTo(User::class, 'acknowledged_by');
     }
 
     public function items()

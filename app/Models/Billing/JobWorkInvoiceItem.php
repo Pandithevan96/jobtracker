@@ -22,8 +22,8 @@ class JobWorkInvoiceItem extends Model
     ];
 
     protected $casts = [
-        'quantity'       => 'decimal:2',
-        'rate'           => 'decimal:2',
+        'quantity' => 'decimal:2',
+        'rate' => 'decimal:2',
         'taxable_amount' => 'decimal:2',
     ];
 

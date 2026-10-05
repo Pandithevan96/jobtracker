@@ -2,6 +2,7 @@
 
 namespace App\Models\Vendor;
 
+use App\Models\Workspace\Workspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -24,18 +25,18 @@ class VendorPerformanceScore extends Model
     ];
 
     protected $casts = [
-        'overall_score'              => 'float',
-        'on_time_delivery_score'     => 'float',
-        'quality_yield_score'        => 'float',
+        'overall_score' => 'float',
+        'on_time_delivery_score' => 'float',
+        'quality_yield_score' => 'float',
         'capacity_utilization_score' => 'float',
-        'process_type_breakdown'     => 'array',
-        'total_jobs_completed'       => 'integer',
-        'calculated_at'              => 'datetime',
+        'process_type_breakdown' => 'array',
+        'total_jobs_completed' => 'integer',
+        'calculated_at' => 'datetime',
     ];
 
     public function workspace()
     {
-        return $this->belongsTo(\App\Models\Workspace\Workspace::class, 'workspace_id');
+        return $this->belongsTo(Workspace::class, 'workspace_id');
     }
 
     public function vendor()

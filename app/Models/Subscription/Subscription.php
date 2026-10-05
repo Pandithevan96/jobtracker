@@ -2,6 +2,7 @@
 
 namespace App\Models\Subscription;
 
+use App\Models\Workspace\Workspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -11,9 +12,10 @@ use Illuminate\Database\Eloquent\Model;
  * --------------------------------------------------------------------------------
  * Manages SaaS subscriptions for workspaces.
  *
- * @package App\Models\Subscription
  * @author  Development Team
+ *
  * @version 1.0.0
+ *
  * @since   2026-07-03
  * --------------------------------------------------------------------------------
  */
@@ -22,11 +24,15 @@ class Subscription extends Model
     use HasFactory;
 
     // Status constants
-    const STATUS_ACTIVE    = 1;
-    const STATUS_HALTED    = 2;
+    const STATUS_ACTIVE = 1;
+
+    const STATUS_HALTED = 2;
+
     const STATUS_CANCELLED = 3;
-    const STATUS_EXPIRED   = 4;
-    const STATUS_PENDING   = 5;
+
+    const STATUS_EXPIRED = 4;
+
+    const STATUS_PENDING = 5;
 
     /**
      * The table associated with the model.
@@ -58,12 +64,12 @@ class Subscription extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'plan'                 => 'integer',
-        'status'               => 'integer',
+        'plan' => 'integer',
+        'status' => 'integer',
         'current_period_start' => 'datetime',
-        'current_period_end'   => 'datetime',
-        'trial_ends_at'        => 'datetime',
-        'cancelled_at'         => 'datetime',
+        'current_period_end' => 'datetime',
+        'trial_ends_at' => 'datetime',
+        'cancelled_at' => 'datetime',
     ];
 
     // -------------------------------------------------------------------------
@@ -72,7 +78,7 @@ class Subscription extends Model
 
     public function workspace()
     {
-        return $this->belongsTo(\App\Models\Workspace\Workspace::class, 'workspace_id');
+        return $this->belongsTo(Workspace::class, 'workspace_id');
     }
 
     public function invoices()

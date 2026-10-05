@@ -2,22 +2,29 @@
 
 namespace App\Models\Vendor;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Models\Job\JobOrder;
+use App\Models\User\User;
+use App\Models\Workspace\Workspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Throwable;
 
 class Vendor extends Model
 {
     use HasFactory;
 
     // Status constants
-    const STATUS_ACTIVE    = 1;
-    const STATUS_INACTIVE  = 2;
+    const STATUS_ACTIVE = 1;
+
+    const STATUS_INACTIVE = 2;
+
     const STATUS_SUSPENDED = 3;
 
     // Language constants
     const LANG_ENGLISH = 1;
-    const LANG_TAMIL   = 2;
+
+    const LANG_TAMIL = 2;
 
     /**
      * The table associated with the model.
@@ -55,7 +62,7 @@ class Vendor extends Model
      */
     protected $casts = [
         'preferred_language' => 'integer',
-        'status'             => 'integer',
+        'status' => 'integer',
     ];
 
     /**
@@ -82,7 +89,7 @@ class Vendor extends Model
      */
     public function workspace()
     {
-        return $this->belongsTo(\App\Models\Workspace\Workspace::class, 'workspace_id');
+        return $this->belongsTo(Workspace::class, 'workspace_id');
     }
 
     /**
@@ -90,7 +97,7 @@ class Vendor extends Model
      */
     public function user()
     {
-        return $this->belongsTo(\App\Models\User\User::class, 'user_id');
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     /**
@@ -98,17 +105,17 @@ class Vendor extends Model
      */
     public function jobOrders()
     {
-        return $this->hasMany(\App\Models\Job\JobOrder::class, 'vendor_id');
+        return $this->hasMany(JobOrder::class, 'vendor_id');
     }
 
     /**
      * Helper to auto-link unlinked Vendor records to user accounts and ensure workspace membership.
      * Returns array of vendor IDs belonging to this user.
      */
-    public static function syncUserVendors(\App\Models\User\User $user): array
+    public static function syncUserVendors(User $user): array
     {
         // Auto-link unlinked vendor records that match user's workspace name, email, or phone
-        $ownedWorkspaceNames = \App\Models\Workspace\Workspace::where('owner_id', $user->id)
+        $ownedWorkspaceNames = Workspace::where('owner_id', $user->id)
             ->pluck('name')
             ->filter()
             ->toArray();
@@ -116,7 +123,7 @@ class Vendor extends Model
         $matchConditions = static::whereNull('user_id')
             ->where(function ($q) use ($ownedWorkspaceNames, $user) {
                 $started = false;
-                if (!empty($ownedWorkspaceNames)) {
+                if (! empty($ownedWorkspaceNames)) {
                     $q->whereIn('shop_name', $ownedWorkspaceNames);
                     $started = true;
                 }
@@ -127,14 +134,14 @@ class Vendor extends Model
                 if ($user->phone) {
                     $started ? $q->orWhere('phone', $user->phone) : $q->where('phone', $user->phone);
                 }
-                if (!$started) {
+                if (! $started) {
                     $q->whereRaw('0 = 1'); // No conditions — match nothing
                 }
             });
 
         try {
             $matchConditions->update(['user_id' => $user->id]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Silently handle any DB error during auto-linking
         }
 
@@ -151,4 +158,3 @@ class Vendor extends Model
         return $vendorIds;
     }
 }
-

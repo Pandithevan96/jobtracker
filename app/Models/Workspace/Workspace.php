@@ -2,21 +2,28 @@
 
 namespace App\Models\Workspace;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Models\Job\JobOrder;
+use App\Models\User\User;
+use App\Models\Vendor\Vendor;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class Workspace extends Model
 {
     use HasFactory;
 
     // Plan constants
-    const PLAN_FREE       = 1;
-    const PLAN_FACTORY    = 2;
+    const PLAN_FREE = 1;
+
+    const PLAN_FACTORY = 2;
+
     const PLAN_INDUSTRIAL = 3;
 
     // Status constants
-    const STATUS_ACTIVE    = 1;
+    const STATUS_ACTIVE = 1;
+
     const STATUS_SUSPENDED = 2;
+
     const STATUS_CANCELLED = 3;
 
     // Workspace membership pivot-role constants (workspace_users table).
@@ -25,8 +32,10 @@ class Workspace extends Model
     // meanings — always reference these constants for pivot 'role', never
     // a bare integer, to avoid mixing the two scales up.
     const MEMBER_ROLE_PRINCIPAL = 1;
-    const MEMBER_ROLE_VENDOR    = 2;
-    const MEMBER_ROLE_ADMIN     = 3;
+
+    const MEMBER_ROLE_VENDOR = 2;
+
+    const MEMBER_ROLE_ADMIN = 3;
 
     const MEMBER_STATUS_ACTIVE = 1;
 
@@ -65,10 +74,10 @@ class Workspace extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'plan'                => 'integer',
-        'status'              => 'integer',
+        'plan' => 'integer',
+        'status' => 'integer',
         'dc_count_this_month' => 'integer',
-        'dc_count_reset_at'   => 'datetime',
+        'dc_count_reset_at' => 'datetime',
     ];
 
     // -------------------------------------------------------------------------
@@ -80,7 +89,7 @@ class Workspace extends Model
      */
     public function owner()
     {
-        return $this->belongsTo(\App\Models\User\User::class, 'owner_id');
+        return $this->belongsTo(User::class, 'owner_id');
     }
 
     /**
@@ -89,7 +98,7 @@ class Workspace extends Model
     public function members()
     {
         return $this->belongsToMany(
-            \App\Models\User\User::class,
+            User::class,
             'workspace_users',
             'workspace_id',
             'user_id'
@@ -101,7 +110,7 @@ class Workspace extends Model
      */
     public function vendors()
     {
-        return $this->hasMany(\App\Models\Vendor\Vendor::class, 'workspace_id');
+        return $this->hasMany(Vendor::class, 'workspace_id');
     }
 
     /**
@@ -109,6 +118,6 @@ class Workspace extends Model
      */
     public function jobOrders()
     {
-        return $this->hasMany(\App\Models\Job\JobOrder::class, 'workspace_id');
+        return $this->hasMany(JobOrder::class, 'workspace_id');
     }
 }

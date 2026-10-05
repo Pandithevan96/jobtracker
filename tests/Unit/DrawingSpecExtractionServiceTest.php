@@ -2,14 +2,14 @@
 
 namespace Tests\Unit;
 
-use PHPUnit\Framework\TestCase;
 use App\Services\DrawingSpecExtractionService;
+use PHPUnit\Framework\TestCase;
 
 class DrawingSpecExtractionServiceTest extends TestCase
 {
     public function test_filename_spec_extraction_fallback()
     {
-        $service = new DrawingSpecExtractionService();
+        $service = new DrawingSpecExtractionService;
         $path = 'uploads/DRW_PRECISION_SHAFT_M20_TURNING_AL6061.pdf';
 
         $result = $service->extractSpecs($path);
@@ -21,7 +21,7 @@ class DrawingSpecExtractionServiceTest extends TestCase
 
     public function test_l_bt_shorthand_part_name_expansion_and_clean_part_number()
     {
-        $service = new DrawingSpecExtractionService();
+        $service = new DrawingSpecExtractionService;
         $path = 'uploads/L_Bt.pdf';
 
         $result = $service->extractSpecs($path);
@@ -34,7 +34,7 @@ class DrawingSpecExtractionServiceTest extends TestCase
 
     public function test_shaft_drawing_spec_extraction()
     {
-        $service = new DrawingSpecExtractionService();
+        $service = new DrawingSpecExtractionService;
         $path = 'uploads/10in2HOLE_SHAFT.pdf';
 
         $result = $service->extractSpecs($path);

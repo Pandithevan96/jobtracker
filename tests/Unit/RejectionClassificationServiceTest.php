@@ -2,18 +2,18 @@
 
 namespace Tests\Unit;
 
-use PHPUnit\Framework\TestCase;
 use App\Models\Job\QualityRejection;
 use App\Services\RejectionClassificationService;
+use PHPUnit\Framework\TestCase;
 
 class RejectionClassificationServiceTest extends TestCase
 {
     public function test_heuristic_scrap_classification()
     {
-        $service = new RejectionClassificationService();
+        $service = new RejectionClassificationService;
         $rejection = new QualityRejection([
             'rejection_reason' => 'Deep crack in casting core body',
-            'rejection_type'   => 1,
+            'rejection_type' => 1,
         ]);
 
         $result = $service->classify($rejection);
@@ -24,10 +24,10 @@ class RejectionClassificationServiceTest extends TestCase
 
     public function test_heuristic_rework_classification()
     {
-        $service = new RejectionClassificationService();
+        $service = new RejectionClassificationService;
         $rejection = new QualityRejection([
             'rejection_reason' => 'Excess burrs on flange surface',
-            'rejection_type'   => 2,
+            'rejection_type' => 2,
         ]);
 
         $result = $service->classify($rejection);

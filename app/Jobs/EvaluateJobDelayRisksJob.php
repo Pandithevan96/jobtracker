@@ -45,13 +45,13 @@ class EvaluateJobDelayRisksJob implements ShouldQueue
                     'job_order_id' => $job->id,
                 ],
                 [
-                    'vendor_id'            => $job->vendor_id,
-                    'risk_score'           => $riskData['risk_score'],
-                    'risk_level'           => $riskData['risk_level'],
-                    'delay_probability'    => $riskData['delay_probability'],
+                    'vendor_id' => $job->vendor_id,
+                    'risk_score' => $riskData['risk_score'],
+                    'risk_level' => $riskData['risk_level'],
+                    'delay_probability' => $riskData['delay_probability'],
                     'estimated_delay_days' => $riskData['estimated_delay_days'],
-                    'risk_factors'         => $riskData['risk_factors'],
-                    'calculated_at'        => Carbon::now(),
+                    'risk_factors' => $riskData['risk_factors'],
+                    'calculated_at' => Carbon::now(),
                 ]
             );
 

@@ -33,12 +33,12 @@ class RejectionClassified implements ShouldBroadcastNow
     {
         return [
             'rejection' => [
-                'id'                    => $this->rejection->id,
-                'job_order_id'          => $this->rejection->job_order_id,
-                'ai_defect_tags'        => $this->rejection->ai_defect_tags,
+                'id' => $this->rejection->id,
+                'job_order_id' => $this->rejection->job_order_id,
+                'ai_defect_tags' => $this->rejection->ai_defect_tags,
                 'ai_suggested_category' => $this->rejection->ai_suggested_category,
-                'ai_confidence'         => $this->rejection->ai_confidence,
-                'ai_reviewed'           => $this->rejection->ai_reviewed,
+                'ai_confidence' => $this->rejection->ai_confidence,
+                'ai_reviewed' => $this->rejection->ai_reviewed,
             ],
         ];
     }

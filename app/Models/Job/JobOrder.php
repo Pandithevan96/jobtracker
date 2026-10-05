@@ -2,26 +2,38 @@
 
 namespace App\Models\Job;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Models\User\User;
+use App\Models\Vendor\Vendor;
+use App\Models\Workspace\Workspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class JobOrder extends Model
 {
     use HasFactory;
 
     // Status constants
-    const STATUS_DRAFT           = 1;
-    const STATUS_MATERIAL_OUT    = 2;
-    const STATUS_WIP             = 3;
-    const STATUS_READY           = 4;
+    const STATUS_DRAFT = 1;
+
+    const STATUS_MATERIAL_OUT = 2;
+
+    const STATUS_WIP = 3;
+
+    const STATUS_READY = 4;
+
     const STATUS_DISPATCHED_BACK = 5;
-    const STATUS_COMPLETED       = 6;
-    const STATUS_CANCELLED       = 7;
+
+    const STATUS_COMPLETED = 6;
+
+    const STATUS_CANCELLED = 7;
 
     // Priority constants
-    const PRIORITY_LOW    = 1;
+    const PRIORITY_LOW = 1;
+
     const PRIORITY_NORMAL = 2;
-    const PRIORITY_HIGH   = 3;
+
+    const PRIORITY_HIGH = 3;
+
     const PRIORITY_URGENT = 4;
 
     /**
@@ -61,10 +73,10 @@ class JobOrder extends Model
      */
     protected $casts = [
         'quantity_sent' => 'decimal:2',
-        'due_date'      => 'date',
-        'status'        => 'integer',
-        'priority'      => 'integer',
-        'drawing_urls'  => 'array',
+        'due_date' => 'date',
+        'status' => 'integer',
+        'priority' => 'integer',
+        'drawing_urls' => 'array',
     ];
 
     /**
@@ -79,7 +91,7 @@ class JobOrder extends Model
                 $year = date('Y');
                 // Get highest ID for the current year
                 $latest = self::whereYear('created_at', $year)->latest('id')->first();
-                $seq = $latest ? ((int)substr($latest->order_number, -5) + 1) : 1;
+                $seq = $latest ? ((int) substr($latest->order_number, -5) + 1) : 1;
                 $jobOrder->order_number = sprintf('JO-%s-%05d', $year, $seq);
             }
         });
@@ -94,7 +106,7 @@ class JobOrder extends Model
      */
     public function workspace()
     {
-        return $this->belongsTo(\App\Models\Workspace\Workspace::class, 'workspace_id');
+        return $this->belongsTo(Workspace::class, 'workspace_id');
     }
 
     /**
@@ -102,7 +114,7 @@ class JobOrder extends Model
      */
     public function vendor()
     {
-        return $this->belongsTo(\App\Models\Vendor\Vendor::class, 'vendor_id');
+        return $this->belongsTo(Vendor::class, 'vendor_id');
     }
 
     /**
@@ -110,7 +122,7 @@ class JobOrder extends Model
      */
     public function creator()
     {
-        return $this->belongsTo(\App\Models\User\User::class, 'created_by');
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     /**
@@ -118,7 +130,7 @@ class JobOrder extends Model
      */
     public function statusLogs()
     {
-        return $this->hasMany(\App\Models\Job\JobOrderStatusLog::class, 'job_order_id');
+        return $this->hasMany(JobOrderStatusLog::class, 'job_order_id');
     }
 
     /**
@@ -126,6 +138,6 @@ class JobOrder extends Model
      */
     public function orderNotes()
     {
-        return $this->hasMany(\App\Models\Job\JobOrderNote::class, 'job_order_id')->orderBy('created_at', 'asc');
+        return $this->hasMany(JobOrderNote::class, 'job_order_id')->orderBy('created_at', 'asc');
     }
 }

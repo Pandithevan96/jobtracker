@@ -2,15 +2,15 @@
 
 namespace Tests\Unit;
 
-use PHPUnit\Framework\TestCase;
 use App\Models\Job\JobOrder;
 use App\Services\DelayRiskPredictionService;
+use PHPUnit\Framework\TestCase;
 
 class DelayRiskPredictionServiceTest extends TestCase
 {
     public function test_completed_job_returns_zero_risk()
     {
-        $service = new DelayRiskPredictionService();
+        $service = new DelayRiskPredictionService;
         $job = new JobOrder([
             'id' => 101,
             'workspace_id' => 1,

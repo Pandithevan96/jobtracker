@@ -107,6 +107,17 @@ export const JobOrdersList: React.FC = () => {
       const specs = data?.extracted_specs;
 
       if (specs) {
+        const extractionFailed =
+          specs.part_name === 'API_ERROR_CHECK_NOTES' ||
+          specs.part_number === 'ERROR' ||
+          specs.process_type === 'Error' ||
+          specs.material === 'Error';
+
+        if (extractionFailed) {
+          setCreateError('AI extraction failed. Please check the drawing or try again.');
+          return;
+        }
+
         if (specs.part_name) {
           setNewOrder((prev) => ({
             ...prev,

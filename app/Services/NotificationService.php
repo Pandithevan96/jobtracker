@@ -6,7 +6,9 @@ use App\Models\Job\JobOrder;
 use App\Models\Notification\Notification;
 use App\Models\User\User;
 use App\Models\Vendor\Vendor;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * --------------------------------------------------------------------------------
@@ -19,9 +21,10 @@ use Illuminate\Support\Facades\Log;
  * In production, this is the place to wire in Meta WhatsApp Business API,
  * Twilio SMS, or similar providers.
  *
- * @package App\Services
  * @author  Development Team
+ *
  * @version 1.0.0
+ *
  * @since   2026-07-20
  * --------------------------------------------------------------------------------
  */
@@ -31,13 +34,13 @@ class NotificationService
      * Human-readable labels for Job Order status codes.
      */
     private static array $statusLabels = [
-        JobOrder::STATUS_DRAFT           => 'Draft',
-        JobOrder::STATUS_MATERIAL_OUT    => 'Material Out',
-        JobOrder::STATUS_WIP             => 'WIP',
-        JobOrder::STATUS_READY           => 'Ready',
+        JobOrder::STATUS_DRAFT => 'Draft',
+        JobOrder::STATUS_MATERIAL_OUT => 'Material Out',
+        JobOrder::STATUS_WIP => 'WIP',
+        JobOrder::STATUS_READY => 'Ready',
         JobOrder::STATUS_DISPATCHED_BACK => 'Dispatched Back',
-        JobOrder::STATUS_COMPLETED       => 'Completed',
-        JobOrder::STATUS_CANCELLED       => 'Cancelled',
+        JobOrder::STATUS_COMPLETED => 'Completed',
+        JobOrder::STATUS_CANCELLED => 'Cancelled',
     ];
 
     /**
@@ -48,12 +51,12 @@ class NotificationService
      * the change, builds a natural-language message, and persists a Notification
      * record so the in-app log and (future) live channel can pick it up.
      *
-     * @param  JobOrder  $jobOrder    The affected job order (with vendor loaded).
-     * @param  int       $fromStatus  Previous status integer.
-     * @param  int       $toStatus    New status integer.
-     * @param  User      $changedBy   The authenticated user who triggered the change.
+     * @param  JobOrder  $jobOrder  The affected job order (with vendor loaded).
+     * @param  int  $fromStatus  Previous status integer.
+     * @param  int  $toStatus  New status integer.
+     * @param  User  $changedBy  The authenticated user who triggered the change.
      * @return void
-     * --------------------------------------------------------------------------------
+     *              --------------------------------------------------------------------------------
      */
     public static function dispatchJobStatusChange(
         JobOrder $jobOrder,
@@ -67,7 +70,7 @@ class NotificationService
             $vendor = $jobOrder->vendor;
 
             $fromLabel = self::$statusLabels[$fromStatus] ?? "Status #{$fromStatus}";
-            $toLabel   = self::$statusLabels[$toStatus]   ?? "Status #{$toStatus}";
+            $toLabel = self::$statusLabels[$toStatus] ?? "Status #{$toStatus}";
 
             // ----------------------------------------------------------------
             // Determine who to notify and what their contact is.
@@ -85,7 +88,7 @@ class NotificationService
             if ($isVendorUser) {
                 // Vendor updated → alert principal in-app (phone TBD in prod)
                 $recipientNumber = null; // Principal phone — plug in later
-                $recipientEmail  = null;
+                $recipientEmail = null;
                 $message = sprintf(
                     '🔔 Job Order %s (%s) status changed: %s → %s. Updated by vendor %s.',
                     $jobOrder->order_number,
@@ -97,7 +100,7 @@ class NotificationService
             } else {
                 // Principal updated → alert vendor
                 $recipientNumber = $vendor?->whatsapp_number ?? $vendor?->phone ?? null;
-                $recipientEmail  = $vendor?->email ?? null;
+                $recipientEmail = $vendor?->email ?? null;
                 $message = sprintf(
                     '🔔 Job Order %s (%s) status updated to %s. Please log in to JobTrack to view details.',
                     $jobOrder->order_number,
@@ -107,21 +110,21 @@ class NotificationService
             }
 
             Notification::create([
-                'workspace_id'     => $jobOrder->workspace_id,
-                'job_order_id'     => $jobOrder->id,
-                'vendor_id'        => $vendor?->id,
-                'user_id'          => $changedBy->id,
-                'channel'          => Notification::CHANNEL_WHATSAPP,
-                'type'             => Notification::TYPE_STATUS_UPDATE,
+                'workspace_id' => $jobOrder->workspace_id,
+                'job_order_id' => $jobOrder->id,
+                'vendor_id' => $vendor?->id,
+                'user_id' => $changedBy->id,
+                'channel' => Notification::CHANNEL_WHATSAPP,
+                'type' => Notification::TYPE_STATUS_UPDATE,
                 'recipient_number' => $recipientNumber,
-                'recipient_email'  => $recipientEmail,
-                'message'          => $message,
-                'status'           => Notification::STATUS_PENDING, // Simulated until live API
-                'sent_at'          => now(),
+                'recipient_email' => $recipientEmail,
+                'message' => $message,
+                'status' => Notification::STATUS_PENDING, // Simulated until live API
+                'sent_at' => now(),
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Notification failures must never break the main business flow
-            Log::error('NotificationService::dispatchJobStatusChange failed: ' . $e->getMessage());
+            Log::error('NotificationService::dispatchJobStatusChange failed: '.$e->getMessage());
         }
     }
 
@@ -130,10 +133,10 @@ class NotificationService
      * Dispatch a notification when a Delivery Challan is acknowledged by a vendor.
      * --------------------------------------------------------------------------------
      *
-     * @param  mixed  $challan     The DeliveryChallan model instance.
-     * @param  User   $changedBy   The user who acknowledged it.
+     * @param  mixed  $challan  The DeliveryChallan model instance.
+     * @param  User  $changedBy  The user who acknowledged it.
      * @return void
-     * --------------------------------------------------------------------------------
+     *              --------------------------------------------------------------------------------
      */
     public static function dispatchChallanAcknowledged($challan, User $changedBy): void
     {
@@ -148,20 +151,20 @@ class NotificationService
             );
 
             Notification::create([
-                'workspace_id'     => $challan->workspace_id,
-                'job_order_id'     => $challan->job_order_id,
-                'vendor_id'        => $vendor?->id,
-                'user_id'          => $changedBy->id,
-                'channel'          => Notification::CHANNEL_WHATSAPP,
-                'type'             => Notification::TYPE_DC_GENERATED,
+                'workspace_id' => $challan->workspace_id,
+                'job_order_id' => $challan->job_order_id,
+                'vendor_id' => $vendor?->id,
+                'user_id' => $changedBy->id,
+                'channel' => Notification::CHANNEL_WHATSAPP,
+                'type' => Notification::TYPE_DC_GENERATED,
                 'recipient_number' => null, // Principal phone — plug in later
-                'recipient_email'  => null,
-                'message'          => $message,
-                'status'           => Notification::STATUS_PENDING,
-                'sent_at'          => now(),
+                'recipient_email' => null,
+                'message' => $message,
+                'status' => Notification::STATUS_PENDING,
+                'sent_at' => now(),
             ]);
-        } catch (\Throwable $e) {
-            Log::error('NotificationService::dispatchChallanAcknowledged failed: ' . $e->getMessage());
+        } catch (Throwable $e) {
+            Log::error('NotificationService::dispatchChallanAcknowledged failed: '.$e->getMessage());
         }
     }
 
@@ -170,23 +173,23 @@ class NotificationService
      * Dispatch a notification when a new Job Order is created and assigned to a vendor.
      * --------------------------------------------------------------------------------
      *
-     * @param  JobOrder  $jobOrder   The newly created job order (with vendor loaded).
-     * @param  User      $createdBy  The principal/staff user who created it.
+     * @param  JobOrder  $jobOrder  The newly created job order (with vendor loaded).
+     * @param  User  $createdBy  The principal/staff user who created it.
      * @return void
-     * --------------------------------------------------------------------------------
+     *              --------------------------------------------------------------------------------
      */
     public static function dispatchJobOrderCreated(JobOrder $jobOrder, User $createdBy): void
     {
         try {
             $jobOrder->loadMissing(['vendor', 'workspace', 'creator']);
-            $vendor     = $jobOrder->vendor;
+            $vendor = $jobOrder->vendor;
             $senderName = $jobOrder->workspace?->name ?? $createdBy->name ?? 'Principal';
 
             $dueDateStr = 'N/A';
             if ($jobOrder->due_date) {
                 try {
-                    $dueDateStr = \Carbon\Carbon::parse($jobOrder->due_date)->format('d M Y');
-                } catch (\Throwable $dtEx) {
+                    $dueDateStr = Carbon::parse($jobOrder->due_date)->format('d M Y');
+                } catch (Throwable $dtEx) {
                     $dueDateStr = (string) $jobOrder->due_date;
                 }
             }
@@ -202,20 +205,20 @@ class NotificationService
             );
 
             Notification::create([
-                'workspace_id'     => $jobOrder->workspace_id,
-                'job_order_id'     => $jobOrder->id,
-                'vendor_id'        => $vendor?->id,
-                'user_id'          => $createdBy->id,
-                'channel'          => Notification::CHANNEL_WHATSAPP,
-                'type'             => Notification::TYPE_JOB_CREATED,
+                'workspace_id' => $jobOrder->workspace_id,
+                'job_order_id' => $jobOrder->id,
+                'vendor_id' => $vendor?->id,
+                'user_id' => $createdBy->id,
+                'channel' => Notification::CHANNEL_WHATSAPP,
+                'type' => Notification::TYPE_JOB_CREATED,
                 'recipient_number' => $vendor?->whatsapp_number ?? $vendor?->phone ?? null,
-                'recipient_email'  => $vendor?->email ?? null,
-                'message'          => $message,
-                'status'           => Notification::STATUS_PENDING,
-                'sent_at'          => now(),
+                'recipient_email' => $vendor?->email ?? null,
+                'message' => $message,
+                'status' => Notification::STATUS_PENDING,
+                'sent_at' => now(),
             ]);
-        } catch (\Throwable $e) {
-            Log::error('NotificationService::dispatchJobOrderCreated failed: ' . $e->getMessage());
+        } catch (Throwable $e) {
+            Log::error('NotificationService::dispatchJobOrderCreated failed: '.$e->getMessage());
         }
     }
 }

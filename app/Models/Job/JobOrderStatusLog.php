@@ -2,6 +2,7 @@
 
 namespace App\Models\Job;
 
+use App\Models\User\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -10,10 +11,13 @@ class JobOrderStatusLog extends Model
     use HasFactory;
 
     // Channel constants ("changed_via")
-    const VIA_WEB       = 1;
-    const VIA_PWA       = 2;
-    const VIA_WHATSAPP  = 3;
-    const VIA_QR        = 4;
+    const VIA_WEB = 1;
+
+    const VIA_PWA = 2;
+
+    const VIA_WHATSAPP = 3;
+
+    const VIA_QR = 4;
 
     protected $table = 'job_order_status_logs';
 
@@ -29,7 +33,7 @@ class JobOrderStatusLog extends Model
 
     protected $casts = [
         'from_status' => 'integer',
-        'to_status'   => 'integer',
+        'to_status' => 'integer',
         'changed_via' => 'integer',
     ];
 
@@ -40,6 +44,6 @@ class JobOrderStatusLog extends Model
 
     public function changedBy()
     {
-        return $this->belongsTo(\App\Models\User\User::class, 'changed_by');
+        return $this->belongsTo(User::class, 'changed_by');
     }
 }

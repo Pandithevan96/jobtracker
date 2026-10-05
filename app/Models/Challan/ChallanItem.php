@@ -12,9 +12,10 @@ use Illuminate\Database\Eloquent\Model;
  * Represents a line item in a Delivery Challan.
  * Each item is a specific material/part with quantity and HSN code.
  *
- * @package App\Models\Challan
  * @author  Development Team
+ *
  * @version 1.0.0
+ *
  * @since   2026-07-03
  * --------------------------------------------------------------------------------
  */
@@ -52,8 +53,8 @@ class ChallanItem extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'quantity'    => 'decimal:2',
-        'unit_value'  => 'decimal:2',
+        'quantity' => 'decimal:2',
+        'unit_value' => 'decimal:2',
         'total_value' => 'decimal:2',
     ];
 

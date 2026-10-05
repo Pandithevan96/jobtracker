@@ -10,7 +10,8 @@ class Role extends Model
     use HasFactory;
 
     // Status constants
-    const STATUS_ACTIVE   = 1;
+    const STATUS_ACTIVE = 1;
+
     const STATUS_INACTIVE = 2;
 
     /**
@@ -49,7 +50,7 @@ class Role extends Model
      */
     public function users()
     {
-        return $this->hasMany(\App\Models\User\User::class, 'role_id');
+        return $this->hasMany(User::class, 'role_id');
     }
 
     /**
@@ -57,6 +58,6 @@ class Role extends Model
      */
     public function permissions()
     {
-        return $this->hasMany(\App\Models\User\RolePermission::class, 'role_id');
+        return $this->hasMany(RolePermission::class, 'role_id');
     }
 }

@@ -10,7 +10,8 @@ class Module extends Model
     use HasFactory;
 
     // Status constants
-    const STATUS_ACTIVE   = 1;
+    const STATUS_ACTIVE = 1;
+
     const STATUS_INACTIVE = 2;
 
     /**
@@ -42,7 +43,7 @@ class Module extends Model
      */
     protected $casts = [
         'status' => 'integer',
-        'order'  => 'integer',
+        'order' => 'integer',
     ];
 
     // -------------------------------------------------------------------------
@@ -70,6 +71,6 @@ class Module extends Model
      */
     public function permissions()
     {
-        return $this->hasMany(\App\Models\User\RolePermission::class, 'module_id');
+        return $this->hasMany(RolePermission::class, 'module_id');
     }
 }

@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Job;
 
-use App\Http\Controllers\Controller;
 use App\Helpers\HelperFunction;
-use App\Models\Job\QualityRejection;
+use App\Http\Controllers\Controller;
+use App\Jobs\ClassifyRejectionJob;
 use App\Models\Job\JobOrder;
+use App\Models\Job\QualityRejection;
 use App\Models\Workspace\Workspace;
+use App\Services\RejectionClassificationService;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,9 +22,10 @@ use Symfony\Component\HttpFoundation\Response;
  * Manages quality rejections (scrap, rework, short supply) for job orders.
  * Permissions are enforced via HelperFunction::rolePermission(MODULE_ID).
  *
- * @package App\Http\Controllers\Job
  * @author  Development Team
+ *
  * @version 1.0.0
+ *
  * @since   2026-07-03
  * --------------------------------------------------------------------------------
  */
@@ -43,17 +46,17 @@ class QualityRejectionController extends Controller
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_create) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_create) {
                 return HelperFunction::response(null, null, 'You do not have permission to report quality rejections', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             $validation = Validator::make($request->all(), [
-                'job_order_id'     => 'required|integer|exists:job_orders,id',
-                'rejected_qty'     => 'required|numeric|min:0.01',
-                'accepted_qty'     => 'required|numeric|min:0',
-                'rejection_type'   => 'required|integer|in:1,2,3', // 1-Scrap, 2-Rework, 3-Short Supply
+                'job_order_id' => 'required|integer|exists:job_orders,id',
+                'rejected_qty' => 'required|numeric|min:0.01',
+                'accepted_qty' => 'required|numeric|min:0',
+                'rejection_type' => 'required|integer|in:1,2,3', // 1-Scrap, 2-Rework, 3-Short Supply
                 'rejection_reason' => 'nullable|string',
-                'photo_path'       => 'nullable|string',
+                'photo_path' => 'nullable|string',
             ]);
 
             if ($validation->fails()) {
@@ -67,31 +70,31 @@ class QualityRejectionController extends Controller
             $workspace = Workspace::where('id', $jobOrder->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                      ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'Workspace not found or you do not belong to it', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             $rejection = QualityRejection::create([
-                'job_order_id'     => $jobOrder->id,
-                'reported_by'      => $user->id,
-                'rejected_qty'     => $request->input('rejected_qty'),
-                'accepted_qty'     => $request->input('accepted_qty'),
-                'rejection_type'   => $request->input('rejection_type'),
+                'job_order_id' => $jobOrder->id,
+                'reported_by' => $user->id,
+                'rejected_qty' => $request->input('rejected_qty'),
+                'accepted_qty' => $request->input('accepted_qty'),
+                'rejection_type' => $request->input('rejection_type'),
                 'rejection_reason' => $request->input('rejection_reason'),
-                'photo_path'       => $request->input('photo_path'),
-                'status'           => QualityRejection::STATUS_OPEN,
+                'photo_path' => $request->input('photo_path'),
+                'status' => QualityRejection::STATUS_OPEN,
             ]);
 
             // Dispatch async AI classification job
-            \App\Jobs\ClassifyRejectionJob::dispatch($rejection->id);
+            ClassifyRejectionJob::dispatch($rejection->id);
 
             return HelperFunction::response($rejection, null, 'Quality Rejection reported successfully', 'success', '000', Response::HTTP_CREATED);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to report quality rejection: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to report quality rejection: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -105,13 +108,13 @@ class QualityRejectionController extends Controller
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_view) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_view) {
                 return HelperFunction::response(null, null, 'You do not have permission to view quality rejections', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             $validation = Validator::make($request->all(), [
                 'workspace_id' => 'nullable|integer',
-                'status'       => 'nullable|integer|in:1,2,3,4',
+                'status' => 'nullable|integer|in:1,2,3,4',
             ]);
 
             if ($validation->fails()) {
@@ -126,19 +129,19 @@ class QualityRejectionController extends Controller
                 $workspace = Workspace::where('id', $workspaceId)
                     ->where(function ($q) use ($user) {
                         $q->where('owner_id', $user->id)
-                            ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                            ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                     })
                     ->first();
             }
 
-            if (!$workspace) {
+            if (! $workspace) {
                 $workspace = Workspace::where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })->first();
             }
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response([], null, 'Quality Rejections fetched successfully', 'success', '000', Response::HTTP_OK);
             }
 
@@ -148,8 +151,12 @@ class QualityRejectionController extends Controller
 
             $myVendorIds = Vendor::where('user_id', $user->id)
                 ->orWhere(function ($q) use ($user) {
-                    if ($user->email) $q->where('email', $user->email);
-                    if ($user->phone) $q->orWhere('phone', $user->phone);
+                    if ($user->email) {
+                        $q->where('email', $user->email);
+                    }
+                    if ($user->phone) {
+                        $q->orWhere('phone', $user->phone);
+                    }
                 })
                 ->pluck('id');
 
@@ -177,7 +184,7 @@ class QualityRejectionController extends Controller
 
             return HelperFunction::response($rejections, null, 'Quality Rejections fetched successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to list quality rejections: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to list quality rejections: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -191,7 +198,7 @@ class QualityRejectionController extends Controller
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_view) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_view) {
                 return HelperFunction::response(null, null, 'You do not have permission to view quality rejection details', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -210,17 +217,17 @@ class QualityRejectionController extends Controller
             $workspace = Workspace::where('id', $rejection->jobOrder->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                      ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'You do not have access to this quality rejection', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             return HelperFunction::response($rejection, null, 'Quality Rejection details fetched successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to get quality rejection details: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to get quality rejection details: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -234,7 +241,7 @@ class QualityRejectionController extends Controller
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_edit) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_edit) {
                 return HelperFunction::response(null, null, 'You do not have permission to acknowledge quality rejections', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -253,11 +260,11 @@ class QualityRejectionController extends Controller
             $workspace = Workspace::where('id', $rejection->jobOrder->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                      ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'You do not have access to this quality rejection', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -269,7 +276,7 @@ class QualityRejectionController extends Controller
 
             return HelperFunction::response($rejection->fresh(), null, 'Quality Rejection acknowledged successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to acknowledge quality rejection: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to acknowledge quality rejection: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -283,7 +290,7 @@ class QualityRejectionController extends Controller
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_delete) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_delete) {
                 return HelperFunction::response(null, null, 'You do not have permission to close quality rejections', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -302,11 +309,11 @@ class QualityRejectionController extends Controller
             $workspace = Workspace::where('id', $rejection->jobOrder->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                      ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'You do not have access to this quality rejection', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -318,7 +325,7 @@ class QualityRejectionController extends Controller
 
             return HelperFunction::response($rejection->fresh(), null, 'Quality Rejection closed successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to close quality rejection: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to close quality rejection: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -338,18 +345,18 @@ class QualityRejectionController extends Controller
             }
 
             $rejection = QualityRejection::find($request->input('id'));
-            $service = new \App\Services\RejectionClassificationService();
+            $service = new RejectionClassificationService;
             $result = $service->classify($rejection);
 
             $rejection->update([
-                'ai_defect_tags'        => $result['ai_defect_tags'],
+                'ai_defect_tags' => $result['ai_defect_tags'],
                 'ai_suggested_category' => $result['ai_suggested_category'],
-                'ai_confidence'         => $result['ai_confidence'],
+                'ai_confidence' => $result['ai_confidence'],
             ]);
 
             return HelperFunction::response($rejection->fresh(), null, 'Rejection classified by AI successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to classify rejection: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to classify rejection: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -361,7 +368,7 @@ class QualityRejectionController extends Controller
     {
         try {
             $validation = Validator::make($request->all(), [
-                'id'             => 'required|integer|exists:quality_rejections,id',
+                'id' => 'required|integer|exists:quality_rejections,id',
                 'rejection_type' => 'nullable|integer|in:1,2,3',
             ]);
 
@@ -382,7 +389,7 @@ class QualityRejectionController extends Controller
 
             return HelperFunction::response($rejection->fresh(), null, 'AI classification confirmed successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to confirm AI classification: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to confirm AI classification: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

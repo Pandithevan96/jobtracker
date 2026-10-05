@@ -2,6 +2,7 @@
 
 namespace App\Models\Job;
 
+use App\Models\User\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -11,9 +12,10 @@ use Illuminate\Database\Eloquent\Model;
  * --------------------------------------------------------------------------------
  * Tracks rejected/scrap pieces, reworks, and short supplies for Job Orders.
  *
- * @package App\Models\Job
  * @author  Development Team
+ *
  * @version 1.0.0
+ *
  * @since   2026-07-03
  * --------------------------------------------------------------------------------
  */
@@ -22,15 +24,20 @@ class QualityRejection extends Model
     use HasFactory;
 
     // Rejection type constants
-    const TYPE_SCRAP        = 1;
-    const TYPE_REWORK       = 2;
+    const TYPE_SCRAP = 1;
+
+    const TYPE_REWORK = 2;
+
     const TYPE_SHORT_SUPPLY = 3;
 
     // Status constants
-    const STATUS_OPEN             = 1;
-    const STATUS_ACKNOWLEDGED     = 2;
+    const STATUS_OPEN = 1;
+
+    const STATUS_ACKNOWLEDGED = 2;
+
     const STATUS_REWORK_DISPATCHED = 3;
-    const STATUS_CLOSED           = 4;
+
+    const STATUS_CLOSED = 4;
 
     /**
      * The table associated with the model.
@@ -65,13 +72,13 @@ class QualityRejection extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'rejected_qty'   => 'decimal:2',
-        'accepted_qty'   => 'decimal:2',
+        'rejected_qty' => 'decimal:2',
+        'accepted_qty' => 'decimal:2',
         'rejection_type' => 'integer',
-        'status'         => 'integer',
+        'status' => 'integer',
         'ai_defect_tags' => 'array',
-        'ai_confidence'  => 'float',
-        'ai_reviewed'    => 'boolean',
+        'ai_confidence' => 'float',
+        'ai_reviewed' => 'boolean',
     ];
 
     // -------------------------------------------------------------------------
@@ -85,6 +92,6 @@ class QualityRejection extends Model
 
     public function reporter()
     {
-        return $this->belongsTo(\App\Models\User\User::class, 'reported_by');
+        return $this->belongsTo(User::class, 'reported_by');
     }
 }

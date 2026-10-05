@@ -2,6 +2,10 @@
 
 namespace App\Models\Notification;
 
+use App\Models\Job\JobOrder;
+use App\Models\User\User;
+use App\Models\Vendor\Vendor;
+use App\Models\Workspace\Workspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -11,9 +15,10 @@ use Illuminate\Database\Eloquent\Model;
  * --------------------------------------------------------------------------------
  * Handles multi-channel alerts (WhatsApp, SMS, Email, Push) for Job Orders.
  *
- * @package App\Models\Notification
  * @author  Development Team
+ *
  * @version 1.0.0
+ *
  * @since   2026-07-03
  * --------------------------------------------------------------------------------
  */
@@ -23,22 +28,33 @@ class Notification extends Model
 
     // Channel constants
     const CHANNEL_WHATSAPP = 1;
-    const CHANNEL_SMS      = 2;
-    const CHANNEL_EMAIL    = 3;
-    const CHANNEL_PUSH     = 4;
+
+    const CHANNEL_SMS = 2;
+
+    const CHANNEL_EMAIL = 3;
+
+    const CHANNEL_PUSH = 4;
 
     // Type constants
-    const TYPE_DELAY_ALERT     = 1;
-    const TYPE_STATUS_UPDATE   = 2;
-    const TYPE_DC_GENERATED    = 3;
+    const TYPE_DELAY_ALERT = 1;
+
+    const TYPE_STATUS_UPDATE = 2;
+
+    const TYPE_DC_GENERATED = 3;
+
     const TYPE_REJECTION_ALERT = 4;
-    const TYPE_GENERAL         = 5;
-    const TYPE_JOB_CREATED     = 6;
+
+    const TYPE_GENERAL = 5;
+
+    const TYPE_JOB_CREATED = 6;
 
     // Status constants
-    const STATUS_PENDING   = 1;
-    const STATUS_SENT      = 2;
-    const STATUS_FAILED    = 3;
+    const STATUS_PENDING = 1;
+
+    const STATUS_SENT = 2;
+
+    const STATUS_FAILED = 3;
+
     const STATUS_DELIVERED = 4;
 
     /**
@@ -75,8 +91,8 @@ class Notification extends Model
      */
     protected $casts = [
         'channel' => 'integer',
-        'type'    => 'integer',
-        'status'  => 'integer',
+        'type' => 'integer',
+        'status' => 'integer',
         'sent_at' => 'datetime',
     ];
 
@@ -86,21 +102,21 @@ class Notification extends Model
 
     public function workspace()
     {
-        return $this->belongsTo(\App\Models\Workspace\Workspace::class, 'workspace_id');
+        return $this->belongsTo(Workspace::class, 'workspace_id');
     }
 
     public function jobOrder()
     {
-        return $this->belongsTo(\App\Models\Job\JobOrder::class, 'job_order_id');
+        return $this->belongsTo(JobOrder::class, 'job_order_id');
     }
 
     public function vendor()
     {
-        return $this->belongsTo(\App\Models\Vendor\Vendor::class, 'vendor_id');
+        return $this->belongsTo(Vendor::class, 'vendor_id');
     }
 
     public function user()
     {
-        return $this->belongsTo(\App\Models\User\User::class, 'user_id');
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

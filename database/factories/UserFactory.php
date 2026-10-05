@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\User\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
@@ -15,9 +16,9 @@ class UserFactory extends Factory
     /**
      * The name of the factory's corresponding model.
      *
-     * @var class-string<\Illuminate\Database\Eloquent\Model>
+     * @var class-string<Model>
      */
-    protected $model = \App\Models\User\User::class;
+    protected $model = User::class;
 
     /**
      * The current password being used by the factory.
@@ -46,7 +47,7 @@ class UserFactory extends Factory
      */
     public function unverified(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
         ]);
     }

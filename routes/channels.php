@@ -20,12 +20,12 @@ use Illuminate\Support\Facades\Broadcast;
  * Channel name: job-order.{id}
  */
 Broadcast::channel('job-order.{jobOrderId}', function ($user, $jobOrderId) {
-    if (!$user) {
+    if (! $user) {
         return false;
     }
 
     return [
-        'id'   => $user->id,
+        'id' => $user->id,
         'name' => $user->name,
     ];
 });

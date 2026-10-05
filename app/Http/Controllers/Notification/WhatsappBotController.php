@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Notification;
 
-use App\Http\Controllers\Controller;
 use App\Helpers\HelperFunction;
-use App\Models\Notification\WhatsappBotLog;
+use App\Http\Controllers\Controller;
 use App\Models\Job\JobOrder;
 use App\Models\Job\JobOrderStatusLog;
+use App\Models\Notification\WhatsappBotLog;
 use App\Models\Vendor\Vendor;
 use App\Models\Workspace\Workspace;
 use Exception;
@@ -23,9 +23,10 @@ use Symfony\Component\HttpFoundation\Response;
  * Processes incoming message webhooks to update Job Order status via WhatsApp bot.
  * Exposes a public Webhook endpoint and a protected Logs list endpoint.
  *
- * @package App\Http\Controllers\Notification
  * @author  Development Team
+ *
  * @version 1.0.0
+ *
  * @since   2026-07-03
  * --------------------------------------------------------------------------------
  */
@@ -46,8 +47,8 @@ class WhatsappBotController extends Controller
     {
         try {
             $validation = Validator::make($request->all(), [
-                'from'    => 'required|string',
-                'to'      => 'required|string',
+                'from' => 'required|string',
+                'to' => 'required|string',
                 'message' => 'required|string',
                 'message_id' => 'nullable|string',
             ]);
@@ -56,8 +57,8 @@ class WhatsappBotController extends Controller
                 return response()->json(['status' => 'error', 'message' => $validation->errors()->first()], 400);
             }
 
-            $fromNumber  = $request->input('from');
-            $toNumber    = $request->input('to');
+            $fromNumber = $request->input('from');
+            $toNumber = $request->input('to');
             $messageBody = trim($request->input('message'));
             $waMessageId = $request->input('message_id');
 
@@ -66,17 +67,18 @@ class WhatsappBotController extends Controller
                 ->orWhere('whatsapp_number', $fromNumber)
                 ->first();
 
-            if (!$vendor) {
+            if (! $vendor) {
                 // Log unassociated message
                 WhatsappBotLog::create([
-                    'from_number'   => $fromNumber,
-                    'to_number'     => $toNumber,
-                    'direction'     => WhatsappBotLog::DIRECTION_INBOUND,
-                    'message_body'  => $messageBody,
+                    'from_number' => $fromNumber,
+                    'to_number' => $toNumber,
+                    'direction' => WhatsappBotLog::DIRECTION_INBOUND,
+                    'message_body' => $messageBody,
                     'wa_message_id' => $waMessageId,
-                    'status'        => WhatsappBotLog::STATUS_IGNORED,
+                    'status' => WhatsappBotLog::STATUS_IGNORED,
                     'parsed_intent' => 'No vendor matched phone number',
                 ]);
+
                 return response()->json(['status' => 'ignored', 'reason' => 'Sender number not mapped to any vendor'], 200);
             }
 
@@ -91,24 +93,25 @@ class WhatsappBotController extends Controller
                 preg_match($patternAlt, $messageBody, $matches);
                 if (count($matches) === 3) {
                     $joNumber = $matches[1];
-                    $intent   = strtoupper($matches[2]);
+                    $intent = strtoupper($matches[2]);
                 } else {
                     // Log fail parsing
                     WhatsappBotLog::create([
-                        'workspace_id'  => $vendor->workspace_id,
-                        'vendor_id'     => $vendor->id,
-                        'from_number'   => $fromNumber,
-                        'to_number'     => $toNumber,
-                        'direction'     => WhatsappBotLog::DIRECTION_INBOUND,
-                        'message_body'  => $messageBody,
+                        'workspace_id' => $vendor->workspace_id,
+                        'vendor_id' => $vendor->id,
+                        'from_number' => $fromNumber,
+                        'to_number' => $toNumber,
+                        'direction' => WhatsappBotLog::DIRECTION_INBOUND,
+                        'message_body' => $messageBody,
                         'wa_message_id' => $waMessageId,
-                        'status'        => WhatsappBotLog::STATUS_FAILED,
+                        'status' => WhatsappBotLog::STATUS_FAILED,
                         'parsed_intent' => 'Could not parse JO number and status intent',
                     ]);
+
                     return response()->json(['status' => 'failed_parsing', 'message' => 'Send text in format: STATUS JO-YYYY-XXXXX'], 200);
                 }
             } else {
-                $intent   = strtoupper($matches[1]);
+                $intent = strtoupper($matches[1]);
                 $joNumber = $matches[2];
             }
 
@@ -117,18 +120,19 @@ class WhatsappBotController extends Controller
                 ->where('workspace_id', $vendor->workspace_id)
                 ->first();
 
-            if (!$jobOrder) {
+            if (! $jobOrder) {
                 WhatsappBotLog::create([
-                    'workspace_id'  => $vendor->workspace_id,
-                    'vendor_id'     => $vendor->id,
-                    'from_number'   => $fromNumber,
-                    'to_number'     => $toNumber,
-                    'direction'     => WhatsappBotLog::DIRECTION_INBOUND,
-                    'message_body'  => $messageBody,
+                    'workspace_id' => $vendor->workspace_id,
+                    'vendor_id' => $vendor->id,
+                    'from_number' => $fromNumber,
+                    'to_number' => $toNumber,
+                    'direction' => WhatsappBotLog::DIRECTION_INBOUND,
+                    'message_body' => $messageBody,
                     'wa_message_id' => $waMessageId,
-                    'status'        => WhatsappBotLog::STATUS_FAILED,
+                    'status' => WhatsappBotLog::STATUS_FAILED,
                     'parsed_intent' => "Parsed JO number {$joNumber} not found in vendor workspace",
                 ]);
+
                 return response()->json(['status' => 'not_found', 'message' => 'Job Order not found'], 200);
             }
 
@@ -142,7 +146,7 @@ class WhatsappBotController extends Controller
                 $newStatus = JobOrder::STATUS_DISPATCHED_BACK;
             }
 
-            if (!$newStatus) {
+            if (! $newStatus) {
                 return response()->json(['status' => 'invalid_status'], 200);
             }
 
@@ -154,24 +158,24 @@ class WhatsappBotController extends Controller
             // Create transition status log
             JobOrderStatusLog::create([
                 'job_order_id' => $jobOrder->id,
-                'changed_by'   => $vendor->id, // track by vendor profile
-                'from_status'  => $oldStatus,
-                'to_status'    => $newStatus,
-                'changed_via'  => JobOrderStatusLog::VIA_WHATSAPP,
-                'notes'        => 'Updated via WhatsApp Bot.',
+                'changed_by' => $vendor->id, // track by vendor profile
+                'from_status' => $oldStatus,
+                'to_status' => $newStatus,
+                'changed_via' => JobOrderStatusLog::VIA_WHATSAPP,
+                'notes' => 'Updated via WhatsApp Bot.',
             ]);
 
             // Log bot entry
             WhatsappBotLog::create([
-                'workspace_id'  => $vendor->workspace_id,
-                'vendor_id'     => $vendor->id,
-                'job_order_id'  => $jobOrder->id,
-                'from_number'   => $fromNumber,
-                'to_number'     => $toNumber,
-                'direction'     => WhatsappBotLog::DIRECTION_INBOUND,
-                'message_body'  => $messageBody,
+                'workspace_id' => $vendor->workspace_id,
+                'vendor_id' => $vendor->id,
+                'job_order_id' => $jobOrder->id,
+                'from_number' => $fromNumber,
+                'to_number' => $toNumber,
+                'direction' => WhatsappBotLog::DIRECTION_INBOUND,
+                'message_body' => $messageBody,
                 'wa_message_id' => $waMessageId,
-                'status'        => WhatsappBotLog::STATUS_PROCESSED,
+                'status' => WhatsappBotLog::STATUS_PROCESSED,
                 'parsed_intent' => "Parsed status update to {$intent} for JO {$joNumber}",
             ]);
 
@@ -180,6 +184,7 @@ class WhatsappBotController extends Controller
             return response()->json(['status' => 'success', 'updated_status' => $intent], 200);
         } catch (Exception $e) {
             DB::rollBack();
+
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
     }
@@ -194,7 +199,7 @@ class WhatsappBotController extends Controller
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_view) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_view) {
                 return HelperFunction::response(null, null, 'You do not have permission to view WhatsApp bot logs', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -213,11 +218,11 @@ class WhatsappBotController extends Controller
             $workspace = Workspace::where('id', $workspaceId)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                      ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'Workspace not found or you do not belong to it', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -228,7 +233,7 @@ class WhatsappBotController extends Controller
 
             return HelperFunction::response($logs, null, 'WhatsApp bot logs fetched successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to fetch WhatsApp bot logs: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to fetch WhatsApp bot logs: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

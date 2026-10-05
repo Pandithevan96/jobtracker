@@ -3,40 +3,52 @@
 namespace App\Models\User;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Models\Workspace\Workspace;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
     // Status constants
-    const STATUS_ACTIVE             = 1;
-    const STATUS_INACTIVE           = 2;
+    const STATUS_ACTIVE = 1;
+
+    const STATUS_INACTIVE = 2;
+
     const STATUS_PASSWORD_UNCHANGED = 3;
-    const STATUS_SUSPENDED          = 4;
-    const STATUS_DELETED            = 5;
+
+    const STATUS_SUSPENDED = 4;
+
+    const STATUS_DELETED = 5;
 
     // Gender constants
-    const GENDER_MALE   = 1;
+    const GENDER_MALE = 1;
+
     const GENDER_FEMALE = 2;
-    const GENDER_OTHER  = 3;
+
+    const GENDER_OTHER = 3;
 
     // Role constants (matches role_id foreign key values)
-    const ROLE_ADMIN     = 1;
+    const ROLE_ADMIN = 1;
+
     const ROLE_PRINCIPAL = 2;
-    const ROLE_VENDOR    = 3;
+
+    const ROLE_VENDOR = 3;
 
     // Preferred language constants
     const LANG_ENGLISH = 1;
-    const LANG_TAMIL   = 2;
+
+    const LANG_TAMIL = 2;
 
     // Plan constants
-    const PLAN_FREE       = 1;
-    const PLAN_FACTORY    = 2;
+    const PLAN_FREE = 1;
+
+    const PLAN_FACTORY = 2;
+
     const PLAN_INDUSTRIAL = 3;
 
     /**
@@ -84,13 +96,13 @@ class User extends Authenticatable
      * @var array<string, string>
      */
     protected $casts = [
-        'email_verified_at'  => 'datetime',
-        'password'           => 'hashed',
-        'status'             => 'integer',
-        'role_id'            => 'integer',
-        'gender'             => 'integer',
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+        'status' => 'integer',
+        'role_id' => 'integer',
+        'gender' => 'integer',
         'preferred_language' => 'integer',
-        'plan'               => 'integer',
+        'plan' => 'integer',
     ];
 
     // -------------------------------------------------------------------------
@@ -165,7 +177,7 @@ class User extends Authenticatable
      */
     public function ownedWorkspaces()
     {
-        return $this->hasMany(\App\Models\Workspace\Workspace::class, 'owner_id');
+        return $this->hasMany(Workspace::class, 'owner_id');
     }
 
     /**
@@ -174,7 +186,7 @@ class User extends Authenticatable
     public function workspaces()
     {
         return $this->belongsToMany(
-            \App\Models\Workspace\Workspace::class,
+            Workspace::class,
             'workspace_users',
             'user_id',
             'workspace_id'

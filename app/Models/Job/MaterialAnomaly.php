@@ -2,6 +2,8 @@
 
 namespace App\Models\Job;
 
+use App\Models\User\User;
+use App\Models\Workspace\Workspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -30,16 +32,16 @@ class MaterialAnomaly extends Model
     ];
 
     protected $casts = [
-        'dispatched_qty'  => 'decimal:2',
-        'returned_qty'    => 'decimal:2',
-        'scrap_qty'       => 'decimal:2',
-        'rework_qty'      => 'decimal:2',
+        'dispatched_qty' => 'decimal:2',
+        'returned_qty' => 'decimal:2',
+        'scrap_qty' => 'decimal:2',
+        'rework_qty' => 'decimal:2',
         'implied_wip_qty' => 'decimal:2',
-        'variance_qty'    => 'decimal:2',
-        'variance_pct'    => 'decimal:2',
-        'resolved'        => 'boolean',
-        'resolved_at'     => 'datetime',
-        'detected_at'     => 'datetime',
+        'variance_qty' => 'decimal:2',
+        'variance_pct' => 'decimal:2',
+        'resolved' => 'boolean',
+        'resolved_at' => 'datetime',
+        'detected_at' => 'datetime',
     ];
 
     // -------------------------------------------------------------------------
@@ -48,7 +50,7 @@ class MaterialAnomaly extends Model
 
     public function workspace()
     {
-        return $this->belongsTo(\App\Models\Workspace\Workspace::class, 'workspace_id');
+        return $this->belongsTo(Workspace::class, 'workspace_id');
     }
 
     public function jobOrder()
@@ -58,6 +60,6 @@ class MaterialAnomaly extends Model
 
     public function resolver()
     {
-        return $this->belongsTo(\App\Models\User\User::class, 'resolved_by');
+        return $this->belongsTo(User::class, 'resolved_by');
     }
 }

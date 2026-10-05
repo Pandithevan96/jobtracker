@@ -2,8 +2,9 @@
 
 namespace App\Models\Job;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Models\User\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class JobOrderNote extends Model
 {
@@ -12,7 +13,8 @@ class JobOrderNote extends Model
     protected $table = 'job_order_notes';
 
     const ROLE_PRINCIPAL = 1;
-    const ROLE_VENDOR    = 2;
+
+    const ROLE_VENDOR = 2;
 
     protected $fillable = [
         'job_order_id',
@@ -35,6 +37,6 @@ class JobOrderNote extends Model
 
     public function user()
     {
-        return $this->belongsTo(\App\Models\User\User::class, 'user_id');
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

@@ -3,9 +3,9 @@
 namespace App\Helpers;
 
 use App\Models\User\RolePermission;
-use Throwable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * --------------------------------------------------------------------------------
@@ -34,6 +34,7 @@ class HelperFunction
             return bin2hex(base64_decode($ciphertext));
         } catch (Throwable $exception) {
             Log::error($exception->getMessage(), ['data' => $data, 'client_secret' => $client_secret]);
+
             return '';
         }
     }
@@ -46,6 +47,7 @@ class HelperFunction
         try {
             if ($mac != self::generateMac($encryptedData, $client_secret)) {
                 Log::error('MAC verification failed', ['encrypted_data' => $encryptedData, 'mac' => $mac]);
+
                 return null;
             }
 
@@ -56,6 +58,7 @@ class HelperFunction
             return json_decode($decrypted, true);
         } catch (Throwable $exception) {
             Log::error($exception->getMessage(), ['encrypted_data' => $encryptedData, 'mac' => $mac]);
+
             return null;
         }
     }
@@ -66,9 +69,10 @@ class HelperFunction
     public static function generateMac($data, $client_secret)
     {
         try {
-            return hash('sha256', $data . $client_secret);
+            return hash('sha256', $data.$client_secret);
         } catch (Throwable $exception) {
             Log::error($exception->getMessage(), ['data' => $data]);
+
             return '';
         }
     }
@@ -80,15 +84,15 @@ class HelperFunction
     {
         try {
             $response = [
-                'status'  => $status,
+                'status' => $status,
                 'message' => $message,
-                'code'    => $code,
+                'code' => $code,
             ];
 
             // Only include data and mac for success responses
             if ($status === 'success') {
                 $response['data'] = $data;
-                $response['mac']  = $mac;
+                $response['mac'] = $mac;
             }
 
             if ($status === 'error') {
@@ -100,6 +104,7 @@ class HelperFunction
             return response()->json($response, $http_code);
         } catch (Throwable $exception) {
             Log::error($exception->getMessage());
+
             return response()->json(['status' => 'error', 'message' => $exception->getMessage(), 'code' => '002'], $http_code);
         }
     }
@@ -119,6 +124,7 @@ class HelperFunction
             return $permission;
         } catch (Throwable $exception) {
             Log::error($exception->getMessage());
+
             return null;
         }
     }

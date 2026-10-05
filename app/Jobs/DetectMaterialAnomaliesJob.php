@@ -51,19 +51,19 @@ class DetectMaterialAnomaliesJob implements ShouldQueue
 
             if ($result['status'] === 'anomaly') {
                 $anomalyData = [
-                    'workspace_id'    => $job->workspace_id,
-                    'job_order_id'    => $job->id,
-                    'dispatched_qty'  => $result['dispatched_qty'],
-                    'returned_qty'    => $result['returned_qty'],
-                    'scrap_qty'       => $result['scrap_qty'],
-                    'rework_qty'      => $result['rework_qty'],
+                    'workspace_id' => $job->workspace_id,
+                    'job_order_id' => $job->id,
+                    'dispatched_qty' => $result['dispatched_qty'],
+                    'returned_qty' => $result['returned_qty'],
+                    'scrap_qty' => $result['scrap_qty'],
+                    'rework_qty' => $result['rework_qty'],
                     'implied_wip_qty' => $result['implied_wip_qty'],
-                    'variance_qty'    => $result['variance_qty'],
-                    'variance_pct'    => $result['variance_pct'],
-                    'status'          => 'open',
+                    'variance_qty' => $result['variance_qty'],
+                    'variance_pct' => $result['variance_pct'],
+                    'status' => 'open',
                 ];
 
-                if (!$existingAnomaly) {
+                if (! $existingAnomaly) {
                     $anomalyData['detected_at'] = Carbon::now();
                     $anomalyData['resolved'] = false;
                     $anomaly = MaterialAnomaly::create($anomalyData);
@@ -74,10 +74,10 @@ class DetectMaterialAnomaliesJob implements ShouldQueue
             } elseif ($existingAnomaly) {
                 // Auto-resolve if numbers normalized back within tolerance
                 $existingAnomaly->update([
-                    'status'           => 'auto_resolved',
-                    'resolved'         => true,
+                    'status' => 'auto_resolved',
+                    'resolved' => true,
                     'resolution_notes' => 'Auto-resolved: Reconciliation within tolerance',
-                    'resolved_at'      => Carbon::now(),
+                    'resolved_at' => Carbon::now(),
                 ]);
             }
         }

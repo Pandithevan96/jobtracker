@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Job;
 
-use App\Http\Controllers\Controller;
 use App\Helpers\HelperFunction;
-use App\Models\Job\MaterialReconciliation;
+use App\Http\Controllers\Controller;
 use App\Models\Job\JobOrder;
+use App\Models\Job\MaterialReconciliation;
 use App\Models\Workspace\Workspace;
 use Exception;
 use Illuminate\Http\Request;
@@ -20,9 +20,10 @@ use Symfony\Component\HttpFoundation\Response;
  * Manages ITC-04 material audit trail and balancing calculations.
  * Permissions are enforced via HelperFunction::rolePermission(MODULE_ID).
  *
- * @package App\Http\Controllers\Job
  * @author  Development Team
+ *
  * @version 1.0.0
+ *
  * @since   2026-07-03
  * --------------------------------------------------------------------------------
  */
@@ -43,16 +44,16 @@ class MaterialReconciliationController extends Controller
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_create) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_create) {
                 return HelperFunction::response(null, null, 'You do not have permission to perform material reconciliations', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             $validation = Validator::make($request->all(), [
-                'job_order_id'          => 'required|integer|exists:job_orders,id',
+                'job_order_id' => 'required|integer|exists:job_orders,id',
                 'qty_finished_received' => 'required|numeric|min:0',
-                'qty_scrap'             => 'required|numeric|min:0',
-                'qty_rejected'          => 'required|numeric|min:0',
-                'remarks'               => 'nullable|string',
+                'qty_scrap' => 'required|numeric|min:0',
+                'qty_rejected' => 'required|numeric|min:0',
+                'remarks' => 'nullable|string',
             ]);
 
             if ($validation->fails()) {
@@ -66,11 +67,11 @@ class MaterialReconciliationController extends Controller
             $workspace = Workspace::where('id', $jobOrder->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                      ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'Workspace not found or you do not belong to it', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -81,9 +82,9 @@ class MaterialReconciliationController extends Controller
             }
 
             $qtyDispatched = (float) $jobOrder->quantity_sent;
-            $qtyFinished   = (float) $request->input('qty_finished_received');
-            $qtyScrap      = (float) $request->input('qty_scrap');
-            $qtyRejected   = (float) $request->input('qty_rejected');
+            $qtyFinished = (float) $request->input('qty_finished_received');
+            $qtyScrap = (float) $request->input('qty_scrap');
+            $qtyRejected = (float) $request->input('qty_rejected');
 
             // Calculate shortage: Dispatched - (Finished + Scrap + Rejected)
             $qtyShortage = $qtyDispatched - ($qtyFinished + $qtyScrap + $qtyRejected);
@@ -92,15 +93,15 @@ class MaterialReconciliationController extends Controller
             $isBalanced = abs($qtyShortage) < 0.0001 ? 1 : 0;
 
             $reconciliation = MaterialReconciliation::create([
-                'job_order_id'          => $jobOrder->id,
-                'reconciled_by'         => $user->id,
-                'qty_dispatched'        => $qtyDispatched,
+                'job_order_id' => $jobOrder->id,
+                'reconciled_by' => $user->id,
+                'qty_dispatched' => $qtyDispatched,
                 'qty_finished_received' => $qtyFinished,
-                'qty_scrap'             => $qtyScrap,
-                'qty_rejected'          => $qtyRejected,
-                'qty_shortage'          => $qtyShortage,
-                'is_balanced'           => $isBalanced,
-                'remarks'               => $request->input('remarks'),
+                'qty_scrap' => $qtyScrap,
+                'qty_rejected' => $qtyRejected,
+                'qty_shortage' => $qtyShortage,
+                'is_balanced' => $isBalanced,
+                'remarks' => $request->input('remarks'),
             ]);
 
             // Update Job Order status to completed if balanced
@@ -110,7 +111,7 @@ class MaterialReconciliationController extends Controller
 
             return HelperFunction::response($reconciliation, null, 'Material reconciliation completed successfully', 'success', '000', Response::HTTP_CREATED);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to reconcile material: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to reconcile material: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -124,13 +125,13 @@ class MaterialReconciliationController extends Controller
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_view) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_view) {
                 return HelperFunction::response(null, null, 'You do not have permission to view material reconciliations', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             $validation = Validator::make($request->all(), [
                 'workspace_id' => 'nullable|integer',
-                'is_balanced'  => 'nullable|integer|in:0,1',
+                'is_balanced' => 'nullable|integer|in:0,1',
             ]);
 
             if ($validation->fails()) {
@@ -145,19 +146,19 @@ class MaterialReconciliationController extends Controller
                 $workspace = Workspace::where('id', $workspaceId)
                     ->where(function ($q) use ($user) {
                         $q->where('owner_id', $user->id)
-                            ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                            ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                     })
                     ->first();
             }
 
-            if (!$workspace) {
+            if (! $workspace) {
                 $workspace = Workspace::where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                        ->orWhereHas('members', fn($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })->first();
             }
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response([], null, 'Material reconciliations fetched successfully', 'success', '000', Response::HTTP_OK);
             }
 
@@ -167,8 +168,12 @@ class MaterialReconciliationController extends Controller
 
             $myVendorIds = Vendor::where('user_id', $user->id)
                 ->orWhere(function ($q) use ($user) {
-                    if ($user->email) $q->where('email', $user->email);
-                    if ($user->phone) $q->orWhere('phone', $user->phone);
+                    if ($user->email) {
+                        $q->where('email', $user->email);
+                    }
+                    if ($user->phone) {
+                        $q->orWhere('phone', $user->phone);
+                    }
                 })
                 ->pluck('id');
 
@@ -196,7 +201,7 @@ class MaterialReconciliationController extends Controller
 
             return HelperFunction::response($reconciliations, null, 'Material reconciliations fetched successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to list material reconciliations: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to list material reconciliations: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -210,7 +215,7 @@ class MaterialReconciliationController extends Controller
     {
         try {
             $rolePermission = HelperFunction::rolePermission(self::MODULE_ID);
-            if (!$rolePermission || !$rolePermission->can_access || !$rolePermission->can_view) {
+            if (! $rolePermission || ! $rolePermission->can_access || ! $rolePermission->can_view) {
                 return HelperFunction::response(null, null, 'You do not have permission to view material reconciliation details', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
@@ -229,17 +234,17 @@ class MaterialReconciliationController extends Controller
             $workspace = Workspace::where('id', $reconciliation->jobOrder->workspace_id)
                 ->where(function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
-                      ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
                 })
                 ->first();
 
-            if (!$workspace) {
+            if (! $workspace) {
                 return HelperFunction::response(null, null, 'You do not have access to this reconciliation', 'error', '005', Response::HTTP_FORBIDDEN);
             }
 
             return HelperFunction::response($reconciliation, null, 'Material reconciliation details fetched successfully', 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
-            return HelperFunction::response(null, null, 'Failed to get reconciliation details: ' . $e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
+            return HelperFunction::response(null, null, 'Failed to get reconciliation details: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

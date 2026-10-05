@@ -10,9 +10,6 @@ class DelayRiskPredictionService
 {
     /**
      * Calculate delay risk metrics for a single JobOrder.
-     *
-     * @param JobOrder $job
-     * @return array
      */
     public function calculateJobRisk(JobOrder $job): array
     {
@@ -23,14 +20,14 @@ class DelayRiskPredictionService
         // If job is already completed or cancelled, risk is 0
         if (in_array($job->status, [JobOrder::STATUS_COMPLETED, JobOrder::STATUS_CANCELLED])) {
             return [
-                'job_order_id'         => $job->id,
-                'workspace_id'         => $job->workspace_id,
-                'vendor_id'            => $job->vendor_id,
-                'risk_score'           => 0.0,
-                'risk_level'           => 'low',
-                'delay_probability'    => 0.0,
+                'job_order_id' => $job->id,
+                'workspace_id' => $job->workspace_id,
+                'vendor_id' => $job->vendor_id,
+                'risk_score' => 0.0,
+                'risk_level' => 'low',
+                'delay_probability' => 0.0,
                 'estimated_delay_days' => 0,
-                'risk_factors'         => ['Order completed or cancelled'],
+                'risk_factors' => ['Order completed or cancelled'],
             ];
         }
 
@@ -38,7 +35,7 @@ class DelayRiskPredictionService
         $estimatedDelayDays = 0;
         if ($job->due_date) {
             $dueDate = Carbon::parse($job->due_date);
-            
+
             if ($now->greaterThan($dueDate)) {
                 $daysOverdue = (int) ceil($now->diffInDays($dueDate));
                 $score += min(50.0, 30.0 + ($daysOverdue * 5.0));
@@ -51,7 +48,7 @@ class DelayRiskPredictionService
                     $riskFactors[] = "Due date in {$daysRemaining} day(s) with early manufacturing status";
                 } elseif ($daysRemaining <= 5 && $job->status === JobOrder::STATUS_DRAFT) {
                     $score += 15.0;
-                    $riskFactors[] = "Order still in Draft with 5 or fewer days to due date";
+                    $riskFactors[] = 'Order still in Draft with 5 or fewer days to due date';
                 }
             }
         }
@@ -70,7 +67,7 @@ class DelayRiskPredictionService
                         ->where('to_status', JobOrder::STATUS_COMPLETED)
                         ->latest()
                         ->first();
-                    
+
                     $completedAt = $lastLog ? $lastLog->created_at : $pj->updated_at;
                     if ($completedAt && Carbon::parse($completedAt)->greaterThan(Carbon::parse($pj->due_date))) {
                         $lateCount++;
@@ -121,14 +118,14 @@ class DelayRiskPredictionService
         }
 
         return [
-            'job_order_id'         => $job->id,
-            'workspace_id'         => $job->workspace_id,
-            'vendor_id'            => $job->vendor_id,
-            'risk_score'           => $riskScore,
-            'risk_level'           => $riskLevel,
-            'delay_probability'    => $delayProbability,
+            'job_order_id' => $job->id,
+            'workspace_id' => $job->workspace_id,
+            'vendor_id' => $job->vendor_id,
+            'risk_score' => $riskScore,
+            'risk_level' => $riskLevel,
+            'delay_probability' => $delayProbability,
             'estimated_delay_days' => $estimatedDelayDays,
-            'risk_factors'         => $riskFactors,
+            'risk_factors' => $riskFactors,
         ];
     }
 }
