@@ -13,5 +13,11 @@ php artisan migrate --force
 # Create supervisor log directory
 mkdir -p /var/log/supervisor
 
+# Render passes a PORT env var (usually 10000). Nginx must listen on it.
+if [ -n "$PORT" ]; then
+    sed -i "s/listen 80;/listen ${PORT};/g" /etc/nginx/nginx.conf
+fi
+
+
 # Execute CMD (supervisord) which manages php-serve + reverb + nginx
 exec "$@"
