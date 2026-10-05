@@ -4,16 +4,17 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Imagick;
+use Throwable;
 
 class DrawingSpecExtractionService
 {
     /**
      * Extract engineering specifications from a drawing file/path/image.
      *
-     * @param string $drawingPath Remote URL or relative storage path
-     * @param string|null $localFilePath Full local filesystem path for base64 encoding
-     * @param string|null $originalName Original filename uploaded by user
-     * @return array
+     * @param  string  $drawingPath  Remote URL or relative storage path
+     * @param  string|null  $localFilePath  Full local filesystem path for base64 encoding
+     * @param  string|null  $originalName  Original filename uploaded by user
      */
     public function extractSpecs(string $drawingPath, ?string $localFilePath = null, ?string $originalName = null): array
     {
@@ -26,24 +27,25 @@ class DrawingSpecExtractionService
                 $anthropicKey = config('services.anthropic.api_key');
                 $openAIKey = config('services.openai.api_key');
                 $geminiKey = config('services.gemini.api_key');
-            } catch (\Throwable) {}
+            } catch (Throwable) {
+            }
         }
 
         $anthropicKey = $anthropicKey ?: (getenv('ANTHROPIC_API_KEY') ?: env('ANTHROPIC_API_KEY'));
-        $openAIKey    = $openAIKey ?: (getenv('OPENAI_API_KEY') ?: env('OPENAI_API_KEY'));
-        $geminiKey    = $geminiKey ?: (getenv('GEMINI_API_KEY') ?: env('GEMINI_API_KEY'));
+        $openAIKey = $openAIKey ?: (getenv('OPENAI_API_KEY') ?: env('OPENAI_API_KEY'));
+        $geminiKey = $geminiKey ?: (getenv('GEMINI_API_KEY') ?: env('GEMINI_API_KEY'));
 
         // Prepare Base64 payload for image or PDF rendering
         $base64Data = null;
-        $mediaType  = 'image/jpeg';
-        $pdfText    = '';
+        $mediaType = 'image/jpeg';
+        $pdfText = '';
 
         if ($localFilePath && file_exists($localFilePath)) {
             $extToUse = $originalName ? $originalName : $localFilePath;
             $ext = strtolower(pathinfo($extToUse, PATHINFO_EXTENSION));
             if (in_array($ext, ['png', 'jpg', 'jpeg', 'webp'])) {
                 $mediaType = match ($ext) {
-                    'png'  => 'image/png',
+                    'png' => 'image/png',
                     'webp' => 'image/webp',
                     default => 'image/jpeg',
                 };
@@ -52,52 +54,52 @@ class DrawingSpecExtractionService
                 $pdfText = $this->extractTextFromPdf($localFilePath);
                 try {
                     if (extension_loaded('imagick')) {
-                        $imagick = new \Imagick();
+                        $imagick = new Imagick;
                         $imagick->setResolution(150, 150);
-                        $imagick->readImage($localFilePath . '[0]');
+                        $imagick->readImage($localFilePath.'[0]');
                         $imagick->setImageFormat('jpeg');
                         $imagick->setImageCompressionQuality(85);
                         $base64Data = base64_encode($imagick->getImageBlob());
-                        $mediaType  = 'image/jpeg';
+                        $mediaType = 'image/jpeg';
                     }
-                } catch (\Throwable $e) {
-                    Log::warning('Imagick PDF conversion failed: ' . $e->getMessage());
+                } catch (Throwable $e) {
+                    Log::warning('Imagick PDF conversion failed: '.$e->getMessage());
                 }
             }
         }
 
         $promptText = 'Analyze this technical CAD drawing blueprint image. Read the title block, notes, dimensions, and material details. '
-                    . 'CRITICAL EXTRACTION RULES FOR TITLE BLOCK: '
-                    . '1. "part_number": Look at the title block box marked "DWG NO.", "DRAWING NO.", "PART NO.", or "P/N". Extract the EXACT Drawing Number printed inside that title block box (e.g., "10in2HOLE SHAFT", "OB-6105-LBRKT-01"). DO NOT output the uploaded file name. If no DWG NO box is printed in the title block, derive a structured part code from drawing features (e.g. "DWG-SHFT-01"). '
-                    . '2. "part_name": Extract the full, unabbreviated component title from the title block or geometry (e.g., "10-inch 2-Hole Cylindrical Shaft", "OpenBuilds L-Bracket Heavy Duty Plate"). Expand shorthand terms: "Sht" -> "Cylindrical Shaft", "L Bt" -> "L-Bracket Angle Plate", "Mtg Plt" -> "Mounting Plate". '
-                    . '3. "process_type": Select the primary manufacturing process (e.g., "CNC Turning" for shafts/cylinders/turned parts, "CNC Milling" for machined blocks/pockets, "Laser Cutting", "CNC Bending"). '
-                    . '4. "material": Extract material spec (e.g., "6105-T5 Aluminum Alloy", "SS304 Stainless Steel", "Alloy Steel"). '
-                    . 'Output ONLY valid JSON: {"part_name": string, "part_number": string, "process_type": string, "material": string, "quantity": number, "uom": string, "tolerances": string, "notes": string}';
+                    .'CRITICAL EXTRACTION RULES FOR TITLE BLOCK: '
+                    .'1. "part_number": Look at the title block box marked "DWG NO.", "DRAWING NO.", "PART NO.", or "P/N". Extract the EXACT Drawing Number printed inside that title block box (e.g., "10in2HOLE SHAFT", "OB-6105-LBRKT-01"). DO NOT output the uploaded file name. If no DWG NO box is printed in the title block, derive a structured part code from drawing features (e.g. "DWG-SHFT-01"). '
+                    .'2. "part_name": Extract the full, unabbreviated component title from the title block or geometry (e.g., "10-inch 2-Hole Cylindrical Shaft", "OpenBuilds L-Bracket Heavy Duty Plate"). Expand shorthand terms: "Sht" -> "Cylindrical Shaft", "L Bt" -> "L-Bracket Angle Plate", "Mtg Plt" -> "Mounting Plate". '
+                    .'3. "process_type": Select the primary manufacturing process (e.g., "CNC Turning" for shafts/cylinders/turned parts, "CNC Milling" for machined blocks/pockets, "Laser Cutting", "CNC Bending"). '
+                    .'4. "material": Extract material spec (e.g., "6105-T5 Aluminum Alloy", "SS304 Stainless Steel", "Alloy Steel"). '
+                    .'Output ONLY valid JSON: {"part_name": string, "part_number": string, "process_type": string, "material": string, "quantity": number, "uom": string, "tolerances": string, "notes": string}';
 
         // Option A: Anthropic Claude Vision API
         if ($anthropicKey && ($base64Data || str_starts_with($drawingPath, 'http://') || str_starts_with($drawingPath, 'https://'))) {
             try {
                 $imageSource = $base64Data
                     ? [
-                        'type'       => 'base64',
+                        'type' => 'base64',
                         'media_type' => $mediaType,
-                        'data'       => $base64Data,
+                        'data' => $base64Data,
                     ]
                     : [
                         'type' => 'url',
-                        'url'  => $drawingPath,
+                        'url' => $drawingPath,
                     ];
 
                 $response = Http::withHeaders([
-                    'x-api-key'         => $anthropicKey,
+                    'x-api-key' => $anthropicKey,
                     'anthropic-version' => '2023-06-01',
-                    'content-type'      => 'application/json',
+                    'content-type' => 'application/json',
                 ])->post('https://api.anthropic.com/v1/messages', [
-                    'model'      => 'claude-3-5-sonnet-20241022',
+                    'model' => 'claude-3-5-sonnet-20241022',
                     'max_tokens' => 500,
-                    'messages'   => [
+                    'messages' => [
                         [
-                            'role'    => 'user',
+                            'role' => 'user',
                             'content' => [
                                 ['type' => 'text', 'text' => $promptText],
                                 ['type' => 'image', 'source' => $imageSource],
@@ -109,36 +111,36 @@ class DrawingSpecExtractionService
                 if ($response->successful()) {
                     $jsonText = $response->json('content.0.text');
                     $jsonText = preg_replace('/^```json\s*|\s*```$/i', '', trim($jsonText));
-                    $parsed   = json_decode($jsonText, true);
+                    $parsed = json_decode($jsonText, true);
 
-                    if (is_array($parsed) && !empty($parsed['part_name'])) {
+                    if (is_array($parsed) && ! empty($parsed['part_name'])) {
                         $cleanPartName = $this->sanitizePartName($parsed['part_name'], $pdfText);
-                        $cleanPartNum  = $this->sanitizePartNumber($parsed['part_number'] ?? null, $cleanPartName, $pdfText, $drawingPath);
-                        $material      = !empty($parsed['material']) ? trim($parsed['material']) : 'Specified on Drawing';
-                        $tolerances    = !empty($parsed['tolerances']) ? trim($parsed['tolerances']) : null;
-                        $notes         = !empty($parsed['notes']) ? trim($parsed['notes']) : "Material: {$material}";
+                        $cleanPartNum = $this->sanitizePartNumber($parsed['part_number'] ?? null, $cleanPartName, $pdfText, $drawingPath);
+                        $material = ! empty($parsed['material']) ? trim($parsed['material']) : 'Specified on Drawing';
+                        $tolerances = ! empty($parsed['tolerances']) ? trim($parsed['tolerances']) : null;
+                        $notes = ! empty($parsed['notes']) ? trim($parsed['notes']) : "Material: {$material}";
 
                         return [
                             'extracted_specs' => [
-                                'part_name'    => $cleanPartName,
-                                'part_number'  => $cleanPartNum,
+                                'part_name' => $cleanPartName,
+                                'part_number' => $cleanPartNum,
                                 'process_type' => $parsed['process_type'] ?? 'CNC Milling',
-                                'material'     => $material,
-                                'quantity'     => (int) ($parsed['quantity'] ?? 100),
-                                'uom'          => $parsed['uom'] ?? 'PCS',
-                                'tolerances'   => $tolerances,
-                                'notes'        => $notes,
+                                'material' => $material,
+                                'quantity' => (int) ($parsed['quantity'] ?? 100),
+                                'uom' => $parsed['uom'] ?? 'PCS',
+                                'tolerances' => $tolerances,
+                                'notes' => $notes,
                             ],
                             'confidence_scores' => [
-                                'part_name'    => 0.96,
+                                'part_name' => 0.96,
                                 'process_type' => 0.94,
-                                'material'     => 0.95,
+                                'material' => 0.95,
                             ],
                         ];
                     }
                 }
-            } catch (\Throwable $e) {
-                Log::warning('Claude Vision extraction failed: ' . $e->getMessage());
+            } catch (Throwable $e) {
+                Log::warning('Claude Vision extraction failed: '.$e->getMessage());
             }
         }
 
@@ -146,17 +148,17 @@ class DrawingSpecExtractionService
         if ($openAIKey && $base64Data) {
             try {
                 $response = Http::withHeaders([
-                    'Authorization' => 'Bearer ' . $openAIKey,
-                    'Content-Type'  => 'application/json',
+                    'Authorization' => 'Bearer '.$openAIKey,
+                    'Content-Type' => 'application/json',
                 ])->post('https://api.openai.com/v1/chat/completions', [
-                    'model'    => 'gpt-4o-mini',
+                    'model' => 'gpt-4o-mini',
                     'messages' => [
                         [
-                            'role'    => 'user',
+                            'role' => 'user',
                             'content' => [
                                 ['type' => 'text', 'text' => $promptText],
                                 [
-                                    'type'      => 'image_url',
+                                    'type' => 'image_url',
                                     'image_url' => [
                                         'url' => "data:{$mediaType};base64,{$base64Data}",
                                     ],
@@ -170,36 +172,36 @@ class DrawingSpecExtractionService
                 if ($response->successful()) {
                     $jsonText = $response->json('choices.0.message.content');
                     $jsonText = preg_replace('/^```json\s*|\s*```$/i', '', trim($jsonText));
-                    $parsed   = json_decode($jsonText, true);
+                    $parsed = json_decode($jsonText, true);
 
-                    if (is_array($parsed) && !empty($parsed['part_name'])) {
+                    if (is_array($parsed) && ! empty($parsed['part_name'])) {
                         $cleanPartName = $this->sanitizePartName($parsed['part_name'], $pdfText);
-                        $cleanPartNum  = $this->sanitizePartNumber($parsed['part_number'] ?? null, $cleanPartName, $pdfText, $drawingPath);
-                        $material      = !empty($parsed['material']) ? trim($parsed['material']) : 'Specified on Drawing';
-                        $tolerances    = !empty($parsed['tolerances']) ? trim($parsed['tolerances']) : null;
-                        $notes         = !empty($parsed['notes']) ? trim($parsed['notes']) : "Material: {$material}";
+                        $cleanPartNum = $this->sanitizePartNumber($parsed['part_number'] ?? null, $cleanPartName, $pdfText, $drawingPath);
+                        $material = ! empty($parsed['material']) ? trim($parsed['material']) : 'Specified on Drawing';
+                        $tolerances = ! empty($parsed['tolerances']) ? trim($parsed['tolerances']) : null;
+                        $notes = ! empty($parsed['notes']) ? trim($parsed['notes']) : "Material: {$material}";
 
                         return [
                             'extracted_specs' => [
-                                'part_name'    => $cleanPartName,
-                                'part_number'  => $cleanPartNum,
+                                'part_name' => $cleanPartName,
+                                'part_number' => $cleanPartNum,
                                 'process_type' => $parsed['process_type'] ?? 'CNC Milling',
-                                'material'     => $material,
-                                'quantity'     => (int) ($parsed['quantity'] ?? 100),
-                                'uom'          => $parsed['uom'] ?? 'PCS',
-                                'tolerances'   => $tolerances,
-                                'notes'        => $notes,
+                                'material' => $material,
+                                'quantity' => (int) ($parsed['quantity'] ?? 100),
+                                'uom' => $parsed['uom'] ?? 'PCS',
+                                'tolerances' => $tolerances,
+                                'notes' => $notes,
                             ],
                             'confidence_scores' => [
-                                'part_name'    => 0.95,
+                                'part_name' => 0.95,
                                 'process_type' => 0.93,
-                                'material'     => 0.94,
+                                'material' => 0.94,
                             ],
                         ];
                     }
                 }
-            } catch (\Throwable $e) {
-                Log::warning('OpenAI Vision extraction failed: ' . $e->getMessage());
+            } catch (Throwable $e) {
+                Log::warning('OpenAI Vision extraction failed: '.$e->getMessage());
             }
         }
 
@@ -208,7 +210,7 @@ class DrawingSpecExtractionService
             try {
                 $response = Http::withHeaders([
                     'Content-Type' => 'application/json',
-                ])->post("https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={$geminiKey}", [
+                ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={$geminiKey}", [
                     'contents' => [
                         [
                             'parts' => [
@@ -216,65 +218,66 @@ class DrawingSpecExtractionService
                                 [
                                     'inlineData' => [
                                         'mimeType' => $mediaType,
-                                        'data'      => $base64Data
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
+                                        'data' => $base64Data,
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
                 ]);
 
                 if ($response->successful()) {
                     $jsonText = $response->json('candidates.0.content.parts.0.text');
                     if ($jsonText) {
                         $jsonText = preg_replace('/^```json\s*|\s*```$/i', '', trim($jsonText));
-                        $parsed   = json_decode($jsonText, true);
+                        $parsed = json_decode($jsonText, true);
 
-                        if (is_array($parsed) && !empty($parsed['part_name'])) {
+                        if (is_array($parsed) && ! empty($parsed['part_name'])) {
                             $cleanPartName = $this->sanitizePartName($parsed['part_name'], $pdfText);
-                            $cleanPartNum  = $this->sanitizePartNumber($parsed['part_number'] ?? null, $cleanPartName, $pdfText, $drawingPath);
-                            $material      = !empty($parsed['material']) ? trim($parsed['material']) : 'Specified on Drawing';
-                            $tolerances    = !empty($parsed['tolerances']) ? trim($parsed['tolerances']) : null;
-                            $notes         = !empty($parsed['notes']) ? trim($parsed['notes']) : "Material: {$material}";
+                            $cleanPartNum = $this->sanitizePartNumber($parsed['part_number'] ?? null, $cleanPartName, $pdfText, $drawingPath);
+                            $material = ! empty($parsed['material']) ? trim($parsed['material']) : 'Specified on Drawing';
+                            $tolerances = ! empty($parsed['tolerances']) ? trim($parsed['tolerances']) : null;
+                            $notes = ! empty($parsed['notes']) ? trim($parsed['notes']) : "Material: {$material}";
 
                             return [
                                 'extracted_specs' => [
-                                    'part_name'    => $cleanPartName,
-                                    'part_number'  => $cleanPartNum,
+                                    'part_name' => $cleanPartName,
+                                    'part_number' => $cleanPartNum,
                                     'process_type' => $parsed['process_type'] ?? 'CNC Milling',
-                                    'material'     => $material,
-                                    'quantity'     => (int) ($parsed['quantity'] ?? 100),
-                                    'uom'          => $parsed['uom'] ?? 'PCS',
-                                    'tolerances'   => $tolerances,
-                                    'notes'        => $notes,
+                                    'material' => $material,
+                                    'quantity' => (int) ($parsed['quantity'] ?? 100),
+                                    'uom' => $parsed['uom'] ?? 'PCS',
+                                    'tolerances' => $tolerances,
+                                    'notes' => $notes,
                                 ],
                                 'confidence_scores' => [
-                                    'part_name'    => 0.95,
+                                    'part_name' => 0.95,
                                     'process_type' => 0.93,
-                                    'material'     => 0.94,
+                                    'material' => 0.94,
                                 ],
                             ];
                         }
                     }
                 } else {
                     $errorBody = $response->body();
-                    Log::error('Gemini API Error: ' . $errorBody);
+                    Log::error('Gemini API Error: '.$errorBody);
+
                     return [
                         'extracted_specs' => [
-                            'part_name'    => 'API_ERROR_CHECK_NOTES',
-                            'part_number'  => 'ERROR',
+                            'part_name' => 'API_ERROR_CHECK_NOTES',
+                            'part_number' => 'ERROR',
                             'process_type' => 'Error',
-                            'material'     => 'Error',
-                            'quantity'     => 1,
-                            'uom'          => 'PCS',
-                            'tolerances'   => null,
-                            'notes'        => $errorBody,
+                            'material' => 'Error',
+                            'quantity' => 1,
+                            'uom' => 'PCS',
+                            'tolerances' => null,
+                            'notes' => $errorBody,
                         ],
-                        'confidence_scores' => []
+                        'confidence_scores' => [],
                     ];
                 }
-            } catch (\Throwable $e) {
-                Log::warning('Gemini Vision extraction failed: ' . $e->getMessage());
+            } catch (Throwable $e) {
+                Log::warning('Gemini Vision extraction failed: '.$e->getMessage());
             }
         }
 
@@ -283,7 +286,7 @@ class DrawingSpecExtractionService
         $basename = strtoupper(pathinfo($nameToParse, PATHINFO_FILENAME));
 
         // Combined text source from file name and extracted PDF streams
-        $combinedContext = strtoupper($basename . ' ' . $pdfText);
+        $combinedContext = strtoupper($basename.' '.$pdfText);
 
         $processType = 'CNC Milling';
         if (str_contains($combinedContext, 'SHAFT') || str_contains($combinedContext, 'TURN') || str_contains($combinedContext, 'BUSH') || str_contains($combinedContext, 'CYLINDER') || str_contains($combinedContext, 'HOLE SHAFT')) {
@@ -322,7 +325,7 @@ class DrawingSpecExtractionService
         }
 
         $cleanPartName = $this->sanitizePartName($basename, $pdfText);
-        $cleanPartNum  = $this->sanitizePartNumber(null, $cleanPartName, $pdfText, $basename);
+        $cleanPartNum = $this->sanitizePartNumber(null, $cleanPartName, $pdfText, $basename);
 
         $noteParts = ["Material: {$material}"];
         if ($surfaceFinish) {
@@ -331,19 +334,19 @@ class DrawingSpecExtractionService
 
         return [
             'extracted_specs' => [
-                'part_name'    => $cleanPartName,
-                'part_number'  => $cleanPartNum,
+                'part_name' => $cleanPartName,
+                'part_number' => $cleanPartNum,
                 'process_type' => $processType,
-                'material'     => $material,
-                'quantity'     => 100,
-                'uom'          => 'PCS',
-                'tolerances'   => $tolerances,
-                'notes'        => implode(' | ', $noteParts),
+                'material' => $material,
+                'quantity' => 100,
+                'uom' => 'PCS',
+                'tolerances' => $tolerances,
+                'notes' => implode(' | ', $noteParts),
             ],
             'confidence_scores' => [
-                'part_name'    => 0.90,
+                'part_name' => 0.90,
                 'process_type' => 0.88,
-                'material'     => 0.92,
+                'material' => 0.92,
             ],
         ];
     }
@@ -354,7 +357,9 @@ class DrawingSpecExtractionService
     protected function extractTextFromPdf(string $pdfPath): string
     {
         $content = @file_get_contents($pdfPath);
-        if (!$content) return '';
+        if (! $content) {
+            return '';
+        }
 
         $extracted = [];
         if (preg_match_all('/BT[\s\S]*?ET/m', $content, $matches)) {
@@ -362,7 +367,7 @@ class DrawingSpecExtractionService
                 if (preg_match_all('/\((.*?)\)\s*Tj/m', $block, $strings)) {
                     foreach ($strings[1] as $str) {
                         $str = trim($str);
-                        if (!empty($str) && strlen($str) > 1) {
+                        if (! empty($str) && strlen($str) > 1) {
                             $extracted[] = $str;
                         }
                     }
@@ -372,7 +377,7 @@ class DrawingSpecExtractionService
 
         if (empty($extracted)) {
             preg_match_all('/\(([\w\s\-\.\#\/]{3,})\)/', $content, $strings);
-            if (!empty($strings[1])) {
+            if (! empty($strings[1])) {
                 $extracted = array_slice($strings[1], 0, 50);
             }
         }
@@ -391,7 +396,7 @@ class DrawingSpecExtractionService
         $name = preg_replace('/\.(pdf|png|jpg|jpeg|webp)$/i', '', $name);
         $name = str_replace('_', ' ', $name);
 
-        $combined = strtoupper($name . ' ' . $pdfText);
+        $combined = strtoupper($name.' '.$pdfText);
 
         // Specific Shaft / Hole Shaft expansion
         if (str_contains($combined, '10IN2HOLE') || str_contains($combined, '10IN 2HOLE') || (str_contains($combined, 'SHAFT') && str_contains($combined, 'HOLE'))) {
@@ -410,16 +415,16 @@ class DrawingSpecExtractionService
         // Common abbreviation expansion mapping
         $abbreviations = [
             '/\bL\s*Bracket\b/i' => 'L-Bracket Plate',
-            '/\bBt\b/i'         => 'Bracket',
-            '/\bBkt\b/i'        => 'Bracket',
-            '/\bMtg\b/i'        => 'Mounting',
-            '/\bPlt\b/i'        => 'Plate',
-            '/\bSht\b/i'        => 'Shaft',
-            '/\bShft\b/i'       => 'Shaft',
-            '/\bAl\b/i'         => 'Aluminum',
-            '/\bSs\b/i'         => 'Stainless Steel',
-            '/\bCyl\b/i'        => 'Cylinder',
-            '/\bMach\b/i'       => 'Machined Component',
+            '/\bBt\b/i' => 'Bracket',
+            '/\bBkt\b/i' => 'Bracket',
+            '/\bMtg\b/i' => 'Mounting',
+            '/\bPlt\b/i' => 'Plate',
+            '/\bSht\b/i' => 'Shaft',
+            '/\bShft\b/i' => 'Shaft',
+            '/\bAl\b/i' => 'Aluminum',
+            '/\bSs\b/i' => 'Stainless Steel',
+            '/\bCyl\b/i' => 'Cylinder',
+            '/\bMach\b/i' => 'Machined Component',
         ];
 
         foreach ($abbreviations as $pattern => $replacement) {
@@ -449,15 +454,15 @@ class DrawingSpecExtractionService
         $cleaned = $rawPartNum ? trim($rawPartNum) : '';
 
         // If a valid Part Number / Drawing Number was extracted from the title block box, return it directly!
-        if (!empty($cleaned) 
-            && !preg_match('/^PN-[A-F0-9]{6}$/i', $cleaned) 
-            && !preg_match('/^[a-f0-9]{32,}$/i', $cleaned)
-            && !preg_match('/\.(pdf|png|jpg|jpeg|webp)$/i', $cleaned)) {
+        if (! empty($cleaned)
+            && ! preg_match('/^PN-[A-F0-9]{6}$/i', $cleaned)
+            && ! preg_match('/^[a-f0-9]{32,}$/i', $cleaned)
+            && ! preg_match('/\.(pdf|png|jpg|jpeg|webp)$/i', $cleaned)) {
             return strtoupper($cleaned);
         }
 
         // Check if PDF stream contains explicit DWG NO (e.g., "10in2HOLE SHAFT")
-        if (!empty($pdfText)) {
+        if (! empty($pdfText)) {
             if (preg_match('/(?:DWG\s*NO|DRAWING\s*NO|PART\s*NO)[\s\:\.]*([\w\-\_]+)/i', $pdfText, $m)) {
                 return strtoupper(trim($m[1]));
             }
@@ -475,7 +480,7 @@ class DrawingSpecExtractionService
         $words = explode(' ', preg_replace('/[^A-Za-z0-9\s]/', '', strtoupper($partName)));
         $codeTokens = [];
         foreach ($words as $w) {
-            if (!empty($w) && !in_array($w, ['CYLINDRICAL', 'HEAVY', 'DUTY', 'PLATE', 'ANGLE'])) {
+            if (! empty($w) && ! in_array($w, ['CYLINDRICAL', 'HEAVY', 'DUTY', 'PLATE', 'ANGLE'])) {
                 $codeTokens[] = substr($w, 0, 5);
             }
         }
@@ -485,6 +490,6 @@ class DrawingSpecExtractionService
             $code = 'PART';
         }
 
-        return 'DWG-' . $code . '-01';
+        return 'DWG-'.$code.'-01';
     }
 }
