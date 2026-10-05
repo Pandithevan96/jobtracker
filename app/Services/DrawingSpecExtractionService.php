@@ -56,6 +56,9 @@ class DrawingSpecExtractionService
                 $base64Data = base64_encode(file_get_contents($localFilePath));
             } elseif ($ext === 'pdf') {
                 $pdfText = $this->extractTextFromPdf($localFilePath);
+                $mediaType = 'application/pdf';
+                $base64Data = base64_encode(file_get_contents($localFilePath));
+
                 try {
                     if (extension_loaded('imagick')) {
                         $imagick = new Imagick;
@@ -81,7 +84,7 @@ class DrawingSpecExtractionService
                     .'Output ONLY valid JSON: {"part_name": string, "part_number": string, "process_type": string, "material": string, "quantity": number, "uom": string, "tolerances": string, "notes": string}';
 
         // Option A: Anthropic Claude Vision API
-        if ($anthropicKey && ($base64Data || str_starts_with($drawingPath, 'http://') || str_starts_with($drawingPath, 'https://'))) {
+        if ($anthropicKey && str_starts_with($mediaType, 'image/') && ($base64Data || str_starts_with($drawingPath, 'http://') || str_starts_with($drawingPath, 'https://'))) {
             try {
                 $imageSource = $base64Data
                     ? [
@@ -151,7 +154,7 @@ class DrawingSpecExtractionService
         }
 
         // Option B: OpenAI GPT-4o Vision API
-        if ($openAIKey && $base64Data) {
+        if ($openAIKey && $base64Data && str_starts_with($mediaType, 'image/')) {
             try {
                 $response = Http::withHeaders([
                     'Authorization' => 'Bearer '.$openAIKey,
