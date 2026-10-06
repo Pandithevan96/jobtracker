@@ -147,6 +147,31 @@ export const JobOrdersList: React.FC = () => {
     } catch (err: any) {
       console.error('Drawing extraction failed', err);
       setCreateError(err?.response?.data?.message || 'Failed to extract specs from drawing');
+      
+      const fallbackSpecs = err?.response?.data?.error?.extracted_specs;
+      if (fallbackSpecs && fallbackSpecs.part_name && fallbackSpecs.part_name !== 'API_ERROR_CHECK_NOTES') {
+        setNewOrder((prev) => ({
+          ...prev,
+          part_name: fallbackSpecs.part_name,
+          part_number: fallbackSpecs.part_number || prev.part_number,
+          quantity_sent: fallbackSpecs.quantity || prev.quantity_sent,
+          notes: Array.from(
+            new Set(
+              [
+                prev.notes,
+                fallbackSpecs.notes,
+                fallbackSpecs.tolerances && !fallbackSpecs.notes?.includes('Tolerance') ? `Tolerances: ${fallbackSpecs.tolerances}` : '',
+              ]
+                .filter(Boolean)
+                .flatMap((n) => n.split(' | '))
+            )
+          ).join(' | '),
+        }));
+
+        if (fallbackSpecs.process_type && fallbackSpecs.process_type !== 'Error') {
+          setSelectedProcesses([fallbackSpecs.process_type]);
+        }
+      }
     } finally {
       setExtractingDrawing(false);
     }
