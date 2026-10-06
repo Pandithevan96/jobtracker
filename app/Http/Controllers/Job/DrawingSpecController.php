@@ -76,36 +76,21 @@ class DrawingSpecController extends Controller
 
             $extracted = $this->extractionService->extractSpecs($filePath, $localFilePath, $originalName);
 
-            if ($extracted['is_fallback'] ?? false) {
-                DrawingExtractedSpec::create([
-                    'workspace_id' => $workspace->id,
-                    'drawing_path' => $filePath,
-                    'extracted_specs' => $extracted['extracted_specs'],
-                    'confidence_scores' => $extracted['confidence_scores'],
-                    'status' => 'failed',
-                    'extracted_at' => Carbon::now(),
-                ]);
-
-                return HelperFunction::response(
-                    $extracted,
-                    null,
-                    'AI extraction could not read the drawing. Please check Gemini/OpenAI/Anthropic configuration or upload a clearer PDF/image.',
-                    'error',
-                    '006',
-                    Response::HTTP_UNPROCESSABLE_ENTITY
-                );
-            }
+            $status = ($extracted['is_fallback'] ?? false) ? 'fallback' : 'extracted';
+            $message = ($extracted['is_fallback'] ?? false) 
+                ? 'Extracted specs using fallback (AI vision failed).' 
+                : 'Drawing specs extracted successfully';
 
             $record = DrawingExtractedSpec::create([
                 'workspace_id' => $workspace->id,
                 'drawing_path' => $filePath,
                 'extracted_specs' => $extracted['extracted_specs'],
                 'confidence_scores' => $extracted['confidence_scores'],
-                'status' => 'extracted',
+                'status' => $status,
                 'extracted_at' => Carbon::now(),
             ]);
 
-            return HelperFunction::response($record, null, 'Drawing specs extracted successfully', 'success', '000', Response::HTTP_OK);
+            return HelperFunction::response($record, null, $message, 'success', '000', Response::HTTP_OK);
         } catch (Exception $e) {
             return HelperFunction::response(null, null, 'Failed to extract drawing specs: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
