@@ -18,26 +18,17 @@ class DrawingSpecExtractionService
      */
     public function extractSpecs(string $drawingPath, ?string $localFilePath = null, ?string $originalName = null): array
     {
-        $anthropicKey = null;
         $openAIKey = null;
-        $geminiKey = null;
-        $geminiModel = null;
+        $openAIModel = 'gpt-4o'; // Upgraded from gpt-4o-mini to standard gpt-4o for better vision capabilities
 
         if (function_exists('config')) {
             try {
-                $anthropicKey = config('services.anthropic.api_key');
                 $openAIKey = config('services.openai.api_key');
-                $geminiKey = config('services.gemini.api_key');
-                $geminiModel = config('services.gemini.model');
             } catch (Throwable) {
             }
         }
 
-        $anthropicKey = $anthropicKey ?: (getenv('ANTHROPIC_API_KEY') ?: env('ANTHROPIC_API_KEY'));
         $openAIKey = $openAIKey ?: (getenv('OPENAI_API_KEY') ?: env('OPENAI_API_KEY'));
-        $geminiKey = $geminiKey ?: (getenv('GEMINI_API_KEY') ?: env('GEMINI_API_KEY'));
-        $geminiModel = $geminiModel ?: (getenv('GEMINI_MODEL') ?: env('GEMINI_MODEL', 'gemini-2.0-flash'));
-        $geminiModel = preg_replace('/^models\//', '', (string) $geminiModel);
 
         // Prepare Base64 payload for image or PDF rendering
         $base64Data = null;
@@ -83,84 +74,14 @@ class DrawingSpecExtractionService
                     .'4. "material": Extract material spec (e.g., "6105-T5 Aluminum Alloy", "SS304 Stainless Steel", "Alloy Steel"). '
                     .'Output ONLY valid JSON: {"part_name": string, "part_number": string, "process_type": string, "material": string, "quantity": number, "uom": string, "tolerances": string, "notes": string}';
 
-        // Option A: Anthropic Claude Vision API
-        if ($anthropicKey && str_starts_with($mediaType, 'image/') && ($base64Data || str_starts_with($drawingPath, 'http://') || str_starts_with($drawingPath, 'https://'))) {
-            try {
-                $imageSource = $base64Data
-                    ? [
-                        'type' => 'base64',
-                        'media_type' => $mediaType,
-                        'data' => $base64Data,
-                    ]
-                    : [
-                        'type' => 'url',
-                        'url' => $drawingPath,
-                    ];
-
-                $response = Http::withHeaders([
-                    'x-api-key' => $anthropicKey,
-                    'anthropic-version' => '2023-06-01',
-                    'content-type' => 'application/json',
-                ])->post('https://api.anthropic.com/v1/messages', [
-                    'model' => 'claude-3-5-sonnet-20241022',
-                    'max_tokens' => 500,
-                    'messages' => [
-                        [
-                            'role' => 'user',
-                            'content' => [
-                                ['type' => 'text', 'text' => $promptText],
-                                ['type' => 'image', 'source' => $imageSource],
-                            ],
-                        ],
-                    ],
-                ]);
-
-                if ($response->successful()) {
-                    $jsonText = $response->json('content.0.text');
-                    $jsonText = preg_replace('/^```json\s*|\s*```$/i', '', trim($jsonText));
-                    $parsed = json_decode($jsonText, true);
-
-                    if (is_array($parsed) && ! empty($parsed['part_name'])) {
-                        $cleanPartName = $this->sanitizePartName($parsed['part_name'], $pdfText);
-                        $cleanPartNum = $this->sanitizePartNumber($parsed['part_number'] ?? null, $cleanPartName, $pdfText, $drawingPath);
-                        $material = ! empty($parsed['material']) ? trim($parsed['material']) : 'Specified on Drawing';
-                        $tolerances = ! empty($parsed['tolerances']) ? trim($parsed['tolerances']) : null;
-                        $notes = ! empty($parsed['notes']) ? trim($parsed['notes']) : "Material: {$material}";
-
-                        return [
-                            'extracted_specs' => [
-                                'part_name' => $cleanPartName,
-                                'part_number' => $cleanPartNum,
-                                'process_type' => $parsed['process_type'] ?? 'CNC Milling',
-                                'material' => $material,
-                                'quantity' => (int) ($parsed['quantity'] ?? 100),
-                                'uom' => $parsed['uom'] ?? 'PCS',
-                                'tolerances' => $tolerances,
-                                'notes' => $notes,
-                            ],
-                            'confidence_scores' => [
-                                'part_name' => 0.96,
-                                'process_type' => 0.94,
-                                'material' => 0.95,
-                            ],
-                            'extraction_source' => 'ai_vision',
-                            'is_fallback' => false,
-                        ];
-                    }
-                }
-            } catch (Throwable $e) {
-                Log::warning('Claude Vision extraction failed: '.$e->getMessage());
-            }
-        }
-
-        // Option B: OpenAI GPT-4o Vision API
+        // OpenAI Vision API Integration
         if ($openAIKey && $base64Data && str_starts_with($mediaType, 'image/')) {
             try {
                 $response = Http::withHeaders([
                     'Authorization' => 'Bearer '.$openAIKey,
                     'Content-Type' => 'application/json',
                 ])->post('https://api.openai.com/v1/chat/completions', [
-                    'model' => 'gpt-4o-mini',
+                    'model' => $openAIModel,
                     'messages' => [
                         [
                             'role' => 'user',
@@ -208,79 +129,14 @@ class DrawingSpecExtractionService
                             ],
                             'extraction_source' => 'ai_vision',
                             'is_fallback' => false,
+                            'ai_model' => $openAIModel,
                         ];
                     }
+                } else {
+                    Log::error('OpenAI API Error: '.$response->body());
                 }
             } catch (Throwable $e) {
                 Log::warning('OpenAI Vision extraction failed: '.$e->getMessage());
-            }
-        }
-
-        // Option C: Google Gemini Vision API (Generous Free Tier)
-        if ($geminiKey && $base64Data) {
-            try {
-                $response = Http::withHeaders([
-                    'Content-Type' => 'application/json',
-                ])->post("https://generativelanguage.googleapis.com/v1beta/models/{$geminiModel}:generateContent?key={$geminiKey}", [
-                    'contents' => [
-                        [
-                            'parts' => [
-                                ['text' => $promptText],
-                                [
-                                    'inline_data' => [
-                                        'mime_type' => $mediaType,
-                                        'data' => $base64Data,
-                                    ],
-                                ],
-                            ],
-                        ],
-                    ],
-                    'generationConfig' => [
-                        'responseMimeType' => 'application/json',
-                    ],
-                ]);
-
-                if ($response->successful()) {
-                    $jsonText = $response->json('candidates.0.content.parts.0.text');
-                    if ($jsonText) {
-                        $jsonText = preg_replace('/^```json\s*|\s*```$/i', '', trim($jsonText));
-                        $parsed = json_decode($jsonText, true);
-
-                        if (is_array($parsed) && ! empty($parsed['part_name'])) {
-                            $cleanPartName = $this->sanitizePartName($parsed['part_name'], $pdfText);
-                            $cleanPartNum = $this->sanitizePartNumber($parsed['part_number'] ?? null, $cleanPartName, $pdfText, $drawingPath);
-                            $material = ! empty($parsed['material']) ? trim($parsed['material']) : 'Specified on Drawing';
-                            $tolerances = ! empty($parsed['tolerances']) ? trim($parsed['tolerances']) : null;
-                            $notes = ! empty($parsed['notes']) ? trim($parsed['notes']) : "Material: {$material}";
-
-                            return [
-                                'extracted_specs' => [
-                                    'part_name' => $cleanPartName,
-                                    'part_number' => $cleanPartNum,
-                                    'process_type' => $parsed['process_type'] ?? 'CNC Milling',
-                                    'material' => $material,
-                                    'quantity' => (int) ($parsed['quantity'] ?? 100),
-                                    'uom' => $parsed['uom'] ?? 'PCS',
-                                    'tolerances' => $tolerances,
-                                    'notes' => $notes,
-                                ],
-                                'confidence_scores' => [
-                                    'part_name' => 0.95,
-                                    'process_type' => 0.93,
-                                    'material' => 0.94,
-                                ],
-                                'extraction_source' => 'ai_vision',
-                                'is_fallback' => false,
-                            ];
-                        }
-                    }
-                    Log::warning('Gemini Vision extraction returned no parseable part_name.');
-                } else {
-                    $errorBody = $response->body();
-                    Log::error('Gemini API Error: '.$errorBody);
-                }
-            } catch (Throwable $e) {
-                Log::warning('Gemini Vision extraction failed: '.$e->getMessage());
             }
         }
 
