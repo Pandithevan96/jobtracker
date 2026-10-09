@@ -36,7 +36,7 @@ class DrawingSpecExtractionService
         $anthropicKey = $anthropicKey ?: (getenv('ANTHROPIC_API_KEY') ?: env('ANTHROPIC_API_KEY'));
         $openAIKey = $openAIKey ?: (getenv('OPENAI_API_KEY') ?: env('OPENAI_API_KEY'));
         $geminiKey = $geminiKey ?: (getenv('GEMINI_API_KEY') ?: env('GEMINI_API_KEY'));
-        $geminiModel = $geminiModel ?: (getenv('GEMINI_MODEL') ?: env('GEMINI_MODEL', 'gemini-2.0-flash'));
+        $geminiModel = $geminiModel ?: (getenv('GEMINI_MODEL') ?: env('GEMINI_MODEL', 'gemini-3.8-flash'));
         $geminiModel = preg_replace('/^models\//', '', (string) $geminiModel);
 
         // Prepare Base64 payload for image or PDF rendering
