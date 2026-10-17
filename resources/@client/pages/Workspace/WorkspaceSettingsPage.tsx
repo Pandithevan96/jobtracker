@@ -9,8 +9,8 @@ import {
     AlertCircle,
     Pencil,
     X,
-    MapPin,
     Phone,
+    MapPin,
     Hash,
     FileText,
 } from "lucide-react";
@@ -48,8 +48,6 @@ interface WorkspaceMember {
     pivot?: { role: number; status: number };
 }
 
-// Backend fields only — this form intentionally has no email/currency/timezone
-// inputs since WorkspaceController@update doesn't accept those columns.
 interface WorkspaceForm {
     name: string;
     gstin: string;
@@ -72,31 +70,25 @@ const emptyForm: WorkspaceForm = {
 
 const roleLabel = (role?: number) => {
     switch (role) {
-        case 1:
-            return "Principal";
-        case 2:
-            return "Vendor";
-        case 3:
-            return "Admin";
-        default:
-            return "Member";
+        case 1: return "Principal";
+        case 2: return "Vendor";
+        case 3: return "Admin";
+        default: return "Member";
     }
 };
 
-/** Small helper — renders a labelled read-only field */
-const InfoRow: React.FC<{ label: string; value?: string; icon?: React.ReactNode }> = ({
+/** Small read-only field row */
+const InfoRow: React.FC<{ label: string; value: string; icon?: React.ElementType }> = ({
     label,
     value,
-    icon,
+    icon: Icon,
 }) => (
-    <div>
-        <p className="text-[11px] text-[#666] font-semibold uppercase tracking-wider mb-1">
-            {label}
-        </p>
-        <p className="text-sm text-white font-medium flex items-center gap-2">
-            {icon && <span className="text-[#555]">{icon}</span>}
-            {value || <span className="text-[#555] italic">—</span>}
-        </p>
+    <div className="flex flex-col gap-0.5">
+        <span className="text-[10px] uppercase tracking-wider text-[#666] font-semibold">{label}</span>
+        <div className="flex items-center gap-2">
+            {Icon && <Icon size={13} className="text-[#555] shrink-0" />}
+            <span className="text-sm text-white font-medium">{value || <span className="text-[#555] italic">—</span>}</span>
+        </div>
     </div>
 );
 
@@ -114,7 +106,7 @@ export const WorkspaceSettingsPage: React.FC = () => {
     const [saveError, setSaveError] = useState<string | null>(null);
     const [saved, setSaved] = useState(false);
 
-    // View/edit toggle — starts in edit mode only for new workspaces
+    // View mode: true = read-only display, false = editable form
     const [isEditing, setIsEditing] = useState(false);
 
     useEffect(() => {
@@ -127,13 +119,11 @@ export const WorkspaceSettingsPage: React.FC = () => {
 
         let id = await getCurrentWorkspaceId();
 
-        // If we got an ID from cache, verify it's still valid
         if (id) {
             try {
                 const res = await apiClient.post("/workspaces/details", { id });
 
                 if (res.data?.status === "error") {
-                    // Stale ID — clear it and try fetching the list fresh
                     localStorage.removeItem("workspace_id");
                     localStorage.removeItem("workspace_name");
 
@@ -142,22 +132,31 @@ export const WorkspaceSettingsPage: React.FC = () => {
                     if (Array.isArray(list) && list.length > 0) {
                         id = Number(list[0].id);
                         localStorage.setItem("workspace_id", String(id));
-                        // Retry details with the fresh ID
                         const retry = await apiClient.post("/workspaces/details", { id });
                         if (retry.data?.status === "error" || !retry.data?.data) {
                             setWorkspaceId(null);
                             setForm((f) => ({ ...f, name: user?.name ? `${user.name}'s Company` : "" }));
-                            setIsEditing(true); // no workspace yet — go straight to edit
+                            setIsEditing(true); // No workspace — open create form
                             setLoading(false);
                             return;
                         }
                         const ws = retry.data.data;
                         setWorkspaceId(id);
-                        applyWorkspace(ws);
+                        setForm({
+                            name: ws.name || "",
+                            gstin: ws.gstin || "",
+                            address: ws.address || "",
+                            city: ws.city || "",
+                            state: ws.state || "",
+                            pincode: ws.pincode || "",
+                            phone: ws.phone || "",
+                        });
+                        setOwnerId(ws.owner_id ?? null);
+                        setMembers(Array.isArray(ws.members) ? ws.members : []);
+                        setIsEditing(false); // Existing workspace — show view mode
                         setLoading(false);
                         return;
                     } else {
-                        // No workspaces exist — show create form
                         setWorkspaceId(null);
                         setForm((f) => ({ ...f, name: user?.name ? `${user.name}'s Company` : "" }));
                         setIsEditing(true);
@@ -169,13 +168,23 @@ export const WorkspaceSettingsPage: React.FC = () => {
                 const ws = res.data?.data;
                 if (!ws) {
                     setError("Unexpected response shape from /workspaces/details");
-                    console.error("Unexpected /workspaces/details response:", res.data);
                     setLoading(false);
                     return;
                 }
 
                 setWorkspaceId(id);
-                applyWorkspace(ws);
+                setForm({
+                    name: ws.name || "",
+                    gstin: ws.gstin || "",
+                    address: ws.address || "",
+                    city: ws.city || "",
+                    state: ws.state || "",
+                    pincode: ws.pincode || "",
+                    phone: ws.phone || "",
+                });
+                setOwnerId(ws.owner_id ?? null);
+                setMembers(Array.isArray(ws.members) ? ws.members : []);
+                setIsEditing(false); // Existing workspace — start in view mode
             } catch (e: any) {
                 setError(
                     e?.response?.data?.message ||
@@ -189,7 +198,7 @@ export const WorkspaceSettingsPage: React.FC = () => {
             return;
         }
 
-        // No cached ID at all — show create form in edit mode
+        // No workspace at all — open the create form
         setWorkspaceId(null);
         setForm((f) => ({
             ...f,
@@ -197,21 +206,6 @@ export const WorkspaceSettingsPage: React.FC = () => {
         }));
         setIsEditing(true);
         setLoading(false);
-    };
-
-    const applyWorkspace = (ws: any) => {
-        setForm({
-            name: ws.name || "",
-            gstin: ws.gstin || "",
-            address: ws.address || "",
-            city: ws.city || "",
-            state: ws.state || "",
-            pincode: ws.pincode || "",
-            phone: ws.phone || "",
-        });
-        setOwnerId(ws.owner_id ?? null);
-        setMembers(Array.isArray(ws.members) ? ws.members : []);
-        setIsEditing(false); // existing workspace → view mode by default
     };
 
     const handleSave = async (e: React.FormEvent) => {
@@ -227,9 +221,7 @@ export const WorkspaceSettingsPage: React.FC = () => {
             const res = await apiClient.post(endpoint, payload);
 
             if (res.data?.status === "error") {
-                setSaveError(
-                    res.data.message || "Failed to save workspace settings",
-                );
+                setSaveError(res.data.message || "Failed to save workspace settings");
                 return;
             }
 
@@ -241,7 +233,7 @@ export const WorkspaceSettingsPage: React.FC = () => {
             }
 
             setSaved(true);
-            setIsEditing(false); // switch back to view mode on success
+            setIsEditing(false); // Switch back to view mode after save
             setTimeout(() => setSaved(false), 3000);
 
             if (!workspaceId) {
@@ -257,6 +249,12 @@ export const WorkspaceSettingsPage: React.FC = () => {
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleCancelEdit = () => {
+        setIsEditing(false);
+        setSaveError(null);
+        loadWorkspace(); // Reset form to server values
     };
 
     if (loading) {
@@ -289,29 +287,30 @@ export const WorkspaceSettingsPage: React.FC = () => {
             <div className="flex items-start justify-between">
                 <div>
                     <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-                        Workspace Settings{" "}
-                        <Settings className="text-[#f5a623]" size={24} />
+                        Workspace Settings <Settings className="text-[#f5a623]" size={24} />
                     </h1>
                     <p className="text-xs text-[#888] mt-1">
-                        Configure company details, GSTIN, and team workspace preferences
+                        {isEditing
+                            ? "Edit your company details, GSTIN, and contact information"
+                            : "Your company profile and workspace configuration"}
                     </p>
                 </div>
 
-                {/* Edit / Cancel toggle — only show when a workspace already exists */}
-                {workspaceId && (
+                {/* Edit / Cancel toggle — only show when workspace exists */}
+                {workspaceId && !isEditing && (
                     <button
-                        type="button"
-                        onClick={() => {
-                            setIsEditing((v) => !v);
-                            setSaveError(null);
-                        }}
-                        className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl border cursor-pointer transition-all ${
-                            isEditing
-                                ? "bg-[#222] text-[#aaa] border-[#333] hover:text-white"
-                                : "bg-[#f5a623]/10 text-[#f5a623] border-[#f5a623]/30 hover:bg-[#f5a623]/20"
-                        }`}
+                        onClick={() => setIsEditing(true)}
+                        className="flex items-center gap-2 bg-[#1e1e1e] hover:bg-[#2a2a2a] border border-[#333] text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all cursor-pointer"
                     >
-                        {isEditing ? <><X size={14} /> Cancel</> : <><Pencil size={14} /> Edit</>}
+                        <Pencil size={14} className="text-[#f5a623]" /> Edit Details
+                    </button>
+                )}
+                {workspaceId && isEditing && (
+                    <button
+                        onClick={handleCancelEdit}
+                        className="flex items-center gap-2 bg-[#1e1e1e] hover:bg-[#2a2a2a] border border-[#333] text-[#888] font-bold text-xs px-4 py-2.5 rounded-xl transition-all cursor-pointer"
+                    >
+                        <X size={14} /> Cancel
                     </button>
                 )}
             </div>
@@ -323,43 +322,38 @@ export const WorkspaceSettingsPage: React.FC = () => {
                 </div>
             )}
 
+            {/* Save error */}
             {saveError && (
                 <div className="bg-red-500/15 border border-red-500/30 text-red-300 text-xs px-4 py-3 rounded-xl font-bold flex items-center gap-2">
                     <AlertCircle size={16} /> {saveError}
                 </div>
             )}
 
-            {/* ── VIEW MODE ──────────────────────────────────────────────── */}
+            {/* ── VIEW MODE ─────────────────────────────────────────────────────── */}
             {!isEditing && workspaceId && (
                 <div className="space-y-4">
-                    {/* Organization details card */}
+                    {/* Organization Details — read-only */}
                     <div className="bg-[#141414] border border-[#262626] rounded-2xl p-6 space-y-5">
                         <h2 className="text-sm font-bold text-white flex items-center gap-2">
                             <Building2 size={18} className="text-[#f5a623]" />
                             Organization Details
                         </h2>
 
-                        <div className="space-y-4">
-                            <InfoRow label="Company / Workspace Name" value={form.name} icon={<Building2 size={14} />} />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <InfoRow label="Company / Workspace Name" value={form.name} icon={FileText} />
+                            <InfoRow label="GSTIN Number" value={form.gstin} icon={Hash} />
+                            <InfoRow label="Official Contact Phone" value={form.phone} icon={Phone} />
+                            <InfoRow label="Factory / Office Address" value={form.address} icon={MapPin} />
+                        </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1 border-t border-[#1f1f1f]">
-                                <InfoRow label="GSTIN Number" value={form.gstin} icon={<Hash size={14} />} />
-                                <InfoRow label="Contact Phone" value={form.phone} icon={<Phone size={14} />} />
-                            </div>
-
-                            <div className="pt-1 border-t border-[#1f1f1f]">
-                                <InfoRow label="Factory / Office Address" value={form.address} icon={<MapPin size={14} />} />
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-4 pt-1 border-t border-[#1f1f1f]">
-                                <InfoRow label="City" value={form.city} />
-                                <InfoRow label="State" value={form.state} />
-                                <InfoRow label="Pincode" value={form.pincode} icon={<FileText size={14} />} />
-                            </div>
+                        <div className="grid grid-cols-3 gap-5 border-t border-[#222] pt-4">
+                            <InfoRow label="City" value={form.city} />
+                            <InfoRow label="State" value={form.state} />
+                            <InfoRow label="Pincode" value={form.pincode} />
                         </div>
                     </div>
 
-                    {/* Members card */}
+                    {/* Team Members */}
                     <div className="bg-[#141414] border border-[#262626] rounded-2xl p-6 space-y-4">
                         <h2 className="text-sm font-bold text-white flex items-center gap-2">
                             <Users size={18} className="text-blue-400" />
@@ -378,10 +372,7 @@ export const WorkspaceSettingsPage: React.FC = () => {
                                 </div>
                             ) : (
                                 members.map((m) => (
-                                    <div
-                                        key={m.id}
-                                        className="bg-[#1a1a1a] p-3 rounded-xl border border-[#2a2a2a] flex justify-between items-center"
-                                    >
+                                    <div key={m.id} className="bg-[#1a1a1a] p-3 rounded-xl border border-[#2a2a2a] flex justify-between items-center">
                                         <div>
                                             <p className="font-bold text-white">{m.name}</p>
                                             <p className="text-[11px] text-[#888]">{m.email}</p>
@@ -397,7 +388,7 @@ export const WorkspaceSettingsPage: React.FC = () => {
                 </div>
             )}
 
-            {/* ── EDIT / CREATE MODE ─────────────────────────────────────── */}
+            {/* ── EDIT / CREATE MODE ────────────────────────────────────────────── */}
             {isEditing && (
                 <form onSubmit={handleSave} className="space-y-6">
                     {/* Workspace Identity Card */}
@@ -423,9 +414,7 @@ export const WorkspaceSettingsPage: React.FC = () => {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-[#aaa] font-semibold mb-1">
-                                        GSTIN Number
-                                    </label>
+                                    <label className="block text-[#aaa] font-semibold mb-1">GSTIN Number</label>
                                     <input
                                         type="text"
                                         value={form.gstin}
@@ -434,9 +423,7 @@ export const WorkspaceSettingsPage: React.FC = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[#aaa] font-semibold mb-1">
-                                        Official Contact Phone
-                                    </label>
+                                    <label className="block text-[#aaa] font-semibold mb-1">Official Contact Phone</label>
                                     <input
                                         type="text"
                                         value={form.phone}
@@ -447,15 +434,13 @@ export const WorkspaceSettingsPage: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="block text-[#aaa] font-semibold mb-1">
-                                    Factory / Office Address
-                                </label>
+                                <label className="block text-[#aaa] font-semibold mb-1">Factory / Office Address</label>
                                 <textarea
                                     rows={2}
                                     value={form.address}
                                     onChange={(e) => setForm({ ...form, address: e.target.value })}
                                     className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-white px-3.5 py-2.5 focus:outline-none focus:border-[#f5a623]"
-                                ></textarea>
+                                />
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -490,23 +475,18 @@ export const WorkspaceSettingsPage: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Members & Subscription */}
+                    {/* Members — read-only even in edit mode */}
                     <div className="bg-[#141414] border border-[#262626] rounded-2xl p-6 space-y-4">
                         <h2 className="text-sm font-bold text-white flex items-center gap-2">
                             <Users size={18} className="text-blue-400" />
                             Team Members &amp; Roles
                         </h2>
-
                         <div className="space-y-3 text-xs">
                             {members.length === 0 ? (
                                 <div className="bg-[#1a1a1a] p-3 rounded-xl border border-[#2a2a2a] flex justify-between items-center">
                                     <div>
-                                        <p className="font-bold text-white">
-                                            {user?.name || "Admin User"}
-                                        </p>
-                                        <p className="text-[11px] text-[#888]">
-                                            {user?.email || ""}
-                                        </p>
+                                        <p className="font-bold text-white">{user?.name || "Admin User"}</p>
+                                        <p className="text-[11px] text-[#888]">{user?.email || ""}</p>
                                     </div>
                                     <span className="bg-[#f5a623]/20 text-[#f5a623] border border-[#f5a623]/30 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase">
                                         Owner
@@ -514,10 +494,7 @@ export const WorkspaceSettingsPage: React.FC = () => {
                                 </div>
                             ) : (
                                 members.map((m) => (
-                                    <div
-                                        key={m.id}
-                                        className="bg-[#1a1a1a] p-3 rounded-xl border border-[#2a2a2a] flex justify-between items-center"
-                                    >
+                                    <div key={m.id} className="bg-[#1a1a1a] p-3 rounded-xl border border-[#2a2a2a] flex justify-between items-center">
                                         <div>
                                             <p className="font-bold text-white">{m.name}</p>
                                             <p className="text-[11px] text-[#888]">{m.email}</p>
@@ -535,8 +512,9 @@ export const WorkspaceSettingsPage: React.FC = () => {
                         {workspaceId && (
                             <button
                                 type="button"
-                                onClick={() => { setIsEditing(false); setSaveError(null); }}
-                                className="bg-[#222] hover:bg-[#2a2a2a] text-[#aaa] font-bold text-xs px-5 py-3 rounded-xl border border-[#333] cursor-pointer"
+                                onClick={handleCancelEdit}
+                                disabled={saving}
+                                className="bg-[#1e1e1e] hover:bg-[#2a2a2a] border border-[#333] text-[#aaa] font-bold text-xs px-5 py-3 rounded-xl cursor-pointer disabled:opacity-60"
                             >
                                 Cancel
                             </button>
@@ -546,11 +524,7 @@ export const WorkspaceSettingsPage: React.FC = () => {
                             disabled={saving}
                             className="bg-[#f5a623] hover:bg-[#e0951c] text-black font-bold text-xs px-6 py-3 rounded-xl border-none cursor-pointer flex items-center gap-2 disabled:opacity-60"
                         >
-                            {saving ? (
-                                <Loader2 size={16} className="animate-spin" />
-                            ) : (
-                                <Save size={16} />
-                            )}
+                            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                             {saving ? "Saving..." : workspaceId ? "Save Changes" : "Create Workspace"}
                         </button>
                     </div>
