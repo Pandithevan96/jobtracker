@@ -78,7 +78,7 @@ export const ProfilePage: React.FC = () => {
                 new_password: newPassword,
                 confirm_password: confirmPassword,
             });
-            setMsg({ type: 'success', text: '✓ Password updated successfully!' });
+            setMsg({ type: 'success', text: 'Password updated successfully!' });
             setCurrentPassword('');
             setNewPassword('');
             setConfirmPassword('');
