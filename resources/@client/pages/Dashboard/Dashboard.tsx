@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import apiClient from "@/services/apiClient";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -15,6 +15,7 @@ import {
     ChevronRight,
     Loader2,
     AlertCircle,
+    LayoutGrid,
 } from "lucide-react";
 
 interface MetricCardProps {
@@ -126,6 +127,7 @@ interface Challan {
 
 export const Dashboard: React.FC = () => {
     const { appMode } = useAuth();
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -148,9 +150,19 @@ export const Dashboard: React.FC = () => {
         setLoading(true);
         setError(null);
 
+        // Clear any stale/invalid cached workspace IDs before resolving
+        const cachedId = localStorage.getItem("workspace_id");
+        if (cachedId && (cachedId === "undefined" || cachedId === "null" || isNaN(Number(cachedId)))) {
+            localStorage.removeItem("workspace_id");
+            localStorage.removeItem("workspace_name");
+        }
+
         const workspaceId = await getCurrentWorkspaceId();
         if (!workspaceId) {
-            setError("No workspace selected — cannot load dashboard data.");
+            // No workspace exists — clear stale cache and redirect to create one
+            localStorage.removeItem("workspace_id");
+            localStorage.removeItem("workspace_name");
+            setError("no_workspace");
             setLoading(false);
             return;
         }
@@ -300,7 +312,26 @@ export const Dashboard: React.FC = () => {
             </div>
 
             {/* Error state */}
-            {error && (
+            {error === "no_workspace" && (
+                <div className="flex flex-col items-center justify-center gap-4 text-center py-14 bg-[#141414] border border-[#262626] rounded-2xl">
+                    <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center">
+                        <LayoutGrid size={30} className="text-amber-400" />
+                    </div>
+                    <div>
+                        <p className="text-white font-bold text-sm mb-1">No Workspace Found</p>
+                        <p className="text-xs text-[#888] max-w-xs">
+                            You need to create your company workspace before you can view dashboard data.
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => navigate("/workspace/settings")}
+                        className="bg-[#f5a623] hover:bg-[#e0951c] text-black font-bold text-xs px-5 py-2.5 rounded-xl border-none cursor-pointer flex items-center gap-2"
+                    >
+                        <LayoutGrid size={14} /> Set Up Workspace
+                    </button>
+                </div>
+            )}
+            {error && error !== "no_workspace" && (
                 <div className="flex flex-col items-center justify-center gap-3 text-center py-10 bg-[#141414] border border-[#3a1f1f] rounded-2xl">
                     <AlertCircle size={22} className="text-red-400" />
                     <p className="text-xs text-red-300 max-w-md">{error}</p>
