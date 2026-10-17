@@ -474,7 +474,7 @@ export const JobOrdersList: React.FC = () => {
           <p>3. After that, you can issue Job Orders to your vendors.</p>
         </div>
         <button
-          onClick={() => navigate('/workspace')}
+          onClick={() => navigate('/workspace/settings')}
           className="bg-[#f5a623] hover:bg-[#e0951c] text-black font-bold text-sm px-6 py-3 rounded-xl border-none cursor-pointer flex items-center gap-2 mx-auto"
         >
           <LayoutGrid size={16} /> Create Workspace Now
