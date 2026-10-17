@@ -18,7 +18,7 @@ import {
     X,
     Plus,
     RefreshCw,
-    PackageCheck,
+    Factory,
     IndianRupee,
     FileSpreadsheet,
     ShieldAlert,
@@ -282,7 +282,7 @@ export const Layout: React.FC = () => {
                         >
                             {appMode === 'principal'
                                 ? <><Building2 size={12} /> Principal</>
-                                : <><PackageCheck size={12} /> Vendor</>
+                                : <><Factory size={12} /> Vendor</>
                             }
                         </span>
                         <button

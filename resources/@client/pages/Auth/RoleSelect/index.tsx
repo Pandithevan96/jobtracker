@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, PackageCheck, ArrowRight, Loader2, RefreshCw } from 'lucide-react';
+import { Building2, Factory, ArrowRight, Loader2, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import apiClient from '@/services/apiClient';
 
@@ -201,7 +201,7 @@ export default function RoleSelectPage() {
 
           <div className="flex items-start justify-between mb-5">
             <div className={`p-3.5 rounded-2xl ${hasVendor ? 'bg-emerald-500/15 text-emerald-400' : 'bg-[#222] text-[#555]'}`}>
-              <PackageCheck size={28} />
+              <Factory size={28} />
             </div>
             {hasVendor && (
               <ArrowRight
