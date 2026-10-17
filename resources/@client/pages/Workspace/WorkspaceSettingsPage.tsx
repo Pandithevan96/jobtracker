@@ -99,57 +99,95 @@ export const WorkspaceSettingsPage: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        const id = await getCurrentWorkspaceId();
-        if (!id) {
-            setWorkspaceId(null);
-            setForm((f) => ({
-                ...f,
-                name: user?.name ? `${user.name}'s Company` : "",
-            }));
-            setLoading(false);
+        let id = await getCurrentWorkspaceId();
+
+        // If we got an ID from cache, verify it's still valid
+        if (id) {
+            try {
+                const res = await apiClient.post("/workspaces/details", { id });
+
+                if (res.data?.status === "error") {
+                    // Stale ID — clear it and try fetching the list fresh
+                    localStorage.removeItem("workspace_id");
+                    localStorage.removeItem("workspace_name");
+
+                    const listRes = await apiClient.post("/workspaces/list");
+                    const list = listRes.data?.data;
+                    if (Array.isArray(list) && list.length > 0) {
+                        id = Number(list[0].id);
+                        localStorage.setItem("workspace_id", String(id));
+                        // Retry details with the fresh ID
+                        const retry = await apiClient.post("/workspaces/details", { id });
+                        if (retry.data?.status === "error" || !retry.data?.data) {
+                            setWorkspaceId(null);
+                            setForm((f) => ({ ...f, name: user?.name ? `${user.name}'s Company` : "" }));
+                            setLoading(false);
+                            return;
+                        }
+                        const ws = retry.data.data;
+                        setWorkspaceId(id);
+                        setForm({
+                            name: ws.name || "",
+                            gstin: ws.gstin || "",
+                            address: ws.address || "",
+                            city: ws.city || "",
+                            state: ws.state || "",
+                            pincode: ws.pincode || "",
+                            phone: ws.phone || "",
+                        });
+                        setOwnerId(ws.owner_id ?? null);
+                        setMembers(Array.isArray(ws.members) ? ws.members : []);
+                        setLoading(false);
+                        return;
+                    } else {
+                        // No workspaces exist — show create form
+                        setWorkspaceId(null);
+                        setForm((f) => ({ ...f, name: user?.name ? `${user.name}'s Company` : "" }));
+                        setLoading(false);
+                        return;
+                    }
+                }
+
+                const ws = res.data?.data;
+                if (!ws) {
+                    setError("Unexpected response shape from /workspaces/details");
+                    console.error("Unexpected /workspaces/details response:", res.data);
+                    setLoading(false);
+                    return;
+                }
+
+                setWorkspaceId(id);
+                setForm({
+                    name: ws.name || "",
+                    gstin: ws.gstin || "",
+                    address: ws.address || "",
+                    city: ws.city || "",
+                    state: ws.state || "",
+                    pincode: ws.pincode || "",
+                    phone: ws.phone || "",
+                });
+                setOwnerId(ws.owner_id ?? null);
+                setMembers(Array.isArray(ws.members) ? ws.members : []);
+            } catch (e: any) {
+                setError(
+                    e?.response?.data?.message ||
+                        e?.message ||
+                        "Failed to load workspace details",
+                );
+                console.error("Workspace details fetch failed:", e);
+            } finally {
+                setLoading(false);
+            }
             return;
         }
-        setWorkspaceId(id);
 
-        try {
-            const res = await apiClient.post("/workspaces/details", { id });
-            if (res.data?.status === "error") {
-                setError(
-                    res.data.message || "Failed to load workspace details",
-                );
-                return;
-            }
-            const ws = res.data?.data;
-            if (!ws) {
-                setError("Unexpected response shape from /workspaces/details");
-                console.error(
-                    "Unexpected /workspaces/details response:",
-                    res.data,
-                );
-                return;
-            }
-
-            setForm({
-                name: ws.name || "",
-                gstin: ws.gstin || "",
-                address: ws.address || "",
-                city: ws.city || "",
-                state: ws.state || "",
-                pincode: ws.pincode || "",
-                phone: ws.phone || "",
-            });
-            setOwnerId(ws.owner_id ?? null);
-            setMembers(Array.isArray(ws.members) ? ws.members : []);
-        } catch (e: any) {
-            setError(
-                e?.response?.data?.message ||
-                    e?.message ||
-                    "Failed to load workspace details",
-            );
-            console.error("Workspace details fetch failed:", e);
-        } finally {
-            setLoading(false);
-        }
+        // No cached ID at all — show create form
+        setWorkspaceId(null);
+        setForm((f) => ({
+            ...f,
+            name: user?.name ? `${user.name}'s Company` : "",
+        }));
+        setLoading(false);
     };
 
     const handleSave = async (e: React.FormEvent) => {
