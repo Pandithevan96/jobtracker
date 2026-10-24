@@ -191,22 +191,22 @@ export default function RoleSelectPage() {
           disabled={!hasVendor}
           className={`group relative text-left p-7 rounded-2xl border transition-all duration-300 cursor-pointer
             ${hasVendor
-              ? 'bg-[#141414] border-[#2a2a2a] hover:border-emerald-500 hover:bg-[#181818] hover:shadow-2xl hover:shadow-emerald-500/10'
+              ? 'bg-[#141414] border-[#2a2a2a] hover:border-sky-400 hover:bg-[#181818] hover:shadow-2xl hover:shadow-sky-500/10'
               : 'bg-[#111] border-[#1a1a1a] opacity-40 cursor-not-allowed'
             }`}
         >
           {hasVendor && (
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-sky-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
           )}
 
           <div className="flex items-start justify-between mb-5">
-            <div className={`p-3.5 rounded-2xl ${hasVendor ? 'bg-emerald-500/15 text-emerald-400' : 'bg-[#222] text-[#555]'}`}>
+            <div className={`p-3.5 rounded-2xl ${hasVendor ? 'bg-sky-500/15 text-sky-400' : 'bg-[#222] text-[#555]'}`}>
               <Factory size={28} />
             </div>
             {hasVendor && (
               <ArrowRight
                 size={20}
-                className="text-[#444] group-hover:text-emerald-400 group-hover:translate-x-1 transition-all"
+                className="text-[#444] group-hover:text-sky-400 group-hover:translate-x-1 transition-all"
               />
             )}
           </div>
@@ -222,7 +222,7 @@ export default function RoleSelectPage() {
             <div className="space-y-1.5">
               {vendorWorkspaces.slice(0, 3).map((ws) => (
                 <div key={ws.id} className="flex items-center gap-2 text-[11px] text-[#888]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400 flex-shrink-0" />
                   <span className="truncate font-medium text-gray-300">{ws.name}</span>
                 </div>
               ))}
@@ -236,7 +236,7 @@ export default function RoleSelectPage() {
 
           {hasVendor && (
             <div className="mt-5 pt-4 border-t border-[#222]">
-              <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
+              <span className="text-[11px] font-bold text-sky-400 uppercase tracking-wider">
                 Continue as Vendor →
               </span>
             </div>

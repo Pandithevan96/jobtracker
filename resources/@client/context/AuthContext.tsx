@@ -47,8 +47,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return (saved === 'vendor' || saved === 'principal') ? saved : 'principal';
   });
 
+  useEffect(() => {
+    document.documentElement.dataset.appMode = appMode;
+  }, [appMode]);
+
   const setAppMode = (mode: AppMode) => {
     localStorage.setItem('app_mode', mode);
+    document.documentElement.dataset.appMode = mode;
     setAppModeState(mode);
   };
 
