@@ -154,6 +154,7 @@ Route::prefix('v1')->group(function () {
             Route::post('list', 'Notification\NotificationController@list');
             Route::post('send-test', 'Notification\NotificationController@sendTest');
             Route::post('unread-count', 'Notification\NotificationController@unreadCount');
+            Route::post('mark-read', 'Notification\NotificationController@markRead');
         });
 
         // WhatsApp Bot Logs

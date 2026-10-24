@@ -108,6 +108,13 @@ This causes GST compliance issues, material losses, delayed production, and zero
 
 ## 3. Tech Stack & Architecture
 
+### Render production setup
+
+- Attach a persistent disk mounted at `/var/data` to the Docker web service.
+- Set `PUBLIC_STORAGE_ROOT=/var/data/storage/app/public` in the service environment. The app serves public uploads from this path and creates the Laravel `public/storage` link at startup.
+- Keep the configured database and queue connection available so due reminders and queued jobs can run.
+- The container runs Laravel's scheduler and queue worker under Supervisor. Daily due-date follow-ups appear in the in-app notification feed; they do not send WhatsApp/SMS until a real provider is configured.
+
 ### Technology Stack
 
 | Detail             | Value                          |

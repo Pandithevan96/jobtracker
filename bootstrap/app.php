@@ -26,13 +26,22 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->respond(function (Response $response, Throwable $e, Request $request) {
             if ($request->is('api/*') && $response->getStatusCode() === 500) {
-                return response()->json([
+                $payload = [
                     'status' => 'error',
-                    'exception' => get_class($e),
-                    'message' => $e->getMessage(),
-                    'file' => $e->getFile().':'.$e->getLine(),
-                    'trace' => array_slice(array_map(fn ($t) => ($t['file'] ?? '').':'.($t['line'] ?? '').' ('.($t['function'] ?? '').')', $e->getTrace()), 0, 10),
-                ], 500);
+                    'message' => config('app.debug')
+                        ? $e->getMessage()
+                        : 'An unexpected server error occurred. Please try again.',
+                ];
+
+                if (config('app.debug')) {
+                    $payload += [
+                        'exception' => get_class($e),
+                        'file' => $e->getFile().':'.$e->getLine(),
+                        'trace' => array_slice(array_map(fn ($t) => ($t['file'] ?? '').':'.($t['line'] ?? '').' ('.($t['function'] ?? '').')', $e->getTrace()), 0, 10),
+                    ];
+                }
+
+                return response()->json($payload, 500);
             }
 
             return $response;

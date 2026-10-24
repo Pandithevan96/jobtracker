@@ -66,7 +66,9 @@ class DrawingSpecController extends Controller
                 $file = $request->file('drawing');
                 $originalName = $file->getClientOriginalName();
                 $storedPath = $file->store('drawings', 'public');
-                $localFilePath = storage_path('app/public/'.$storedPath);
+                // Analyze the PHP temporary upload; the persistent public disk
+                // may be mounted outside Laravel's default storage directory.
+                $localFilePath = $file->getRealPath();
                 $filePath = asset('storage/'.$storedPath);
             }
 

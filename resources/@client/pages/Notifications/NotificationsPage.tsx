@@ -53,6 +53,12 @@ export const NotificationsPage: React.FC = () => {
     const markAllRead = async () => {
         setMarkingAll(true);
         try {
+            const workspaceId = localStorage.getItem("workspace_id");
+            const mode = localStorage.getItem("app_mode") || "principal";
+            await apiClient.post("/notifications/mark-read", {
+                mode,
+                ...(workspaceId ? { workspace_id: Number(workspaceId) } : {}),
+            });
             setNotifications((prev) =>
                 Array.isArray(prev)
                     ? prev.map((n) => ({ ...n, read: true }))

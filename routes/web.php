@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,10 +16,11 @@ use Illuminate\Support\Facades\Route;
 
 // Serve storage files directly (e.g., uploaded note attachments, drawing files)
 Route::get('/storage/{path}', function ($path) {
-    $fullPath = storage_path('app/public/'.$path);
-    if (! file_exists($fullPath)) {
+    if (str_contains($path, '..') || ! Storage::disk('public')->exists($path)) {
         abort(404);
     }
+
+    $fullPath = Storage::disk('public')->path($path);
     $mime = mime_content_type($fullPath) ?: 'application/octet-stream';
 
     return response()->file($fullPath, [

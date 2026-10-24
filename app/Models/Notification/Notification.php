@@ -48,6 +48,8 @@ class Notification extends Model
 
     const TYPE_JOB_CREATED = 6;
 
+    const TYPE_DUE_REMINDER = 7;
+
     // Status constants
     const STATUS_PENDING = 1;
 
@@ -82,6 +84,7 @@ class Notification extends Model
         'status',
         'error_message',
         'sent_at',
+        'read_at',
     ];
 
     /**
@@ -94,6 +97,7 @@ class Notification extends Model
         'type' => 'integer',
         'status' => 'integer',
         'sent_at' => 'datetime',
+        'read_at' => 'datetime',
     ];
 
     // -------------------------------------------------------------------------

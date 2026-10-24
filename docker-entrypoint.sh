@@ -10,6 +10,13 @@ php artisan route:clear || true
 # Run database migrations
 php artisan migrate --force
 
+# If Render's persistent disk is configured, serve public uploads directly
+# from that disk so drawings survive service restarts and deployments.
+if [ -n "$PUBLIC_STORAGE_ROOT" ]; then
+    mkdir -p "$PUBLIC_STORAGE_ROOT"
+fi
+php artisan storage:link --force || true
+
 # Create supervisor log directory
 mkdir -p /var/log/supervisor
 

@@ -175,6 +175,8 @@ class NotificationController extends Controller
                     $typeLabel = 'challan';
                 } elseif ($n->type === Notification::TYPE_REJECTION_ALERT) {
                     $typeLabel = 'rejection';
+                } elseif ($n->type === Notification::TYPE_DUE_REMINDER) {
+                    $typeLabel = 'job';
                 }
 
                 $title = 'System Alert';
@@ -186,6 +188,8 @@ class NotificationController extends Controller
                     $title = 'Delivery Challan Update';
                 } elseif ($n->type === Notification::TYPE_REJECTION_ALERT) {
                     $title = 'Quality Rejection Alert';
+                } elseif ($n->type === Notification::TYPE_DUE_REMINDER) {
+                    $title = 'Job Order Follow-up';
                 }
 
                 $msg = $n->message;
@@ -202,7 +206,7 @@ class NotificationController extends Controller
                     'message' => $msg,
                     'type' => $typeLabel,
                     'created_at' => $n->created_at ? $n->created_at->diffForHumans() : 'Recently',
-                    'read' => $n->status === Notification::STATUS_DELIVERED || $n->status === Notification::STATUS_SENT,
+                    'read' => $n->read_at !== null,
                 ];
             });
 
@@ -263,6 +267,7 @@ class NotificationController extends Controller
                 'message' => $request->input('message'),
                 'status' => Notification::STATUS_SENT,
                 'sent_at' => now(),
+                'read_at' => now(),
             ]);
 
             return HelperFunction::response($notification, null, 'Test notification triggered successfully', 'success', '000', Response::HTTP_CREATED);
@@ -314,7 +319,7 @@ class NotificationController extends Controller
 
             $mode = $request->input('mode') ?? $request->header('X-App-Mode') ?? 'principal';
 
-            $query = Notification::where('created_at', '>=', now()->subDays(30));
+            $query = Notification::whereNull('read_at')->where('created_at', '>=', now()->subDays(30));
 
             if ($mode === 'vendor') {
                 $query->where(function ($q) use ($myVendorIds, $myJobOrderIds, $user) {
@@ -361,5 +366,59 @@ class NotificationController extends Controller
         } catch (Exception $e) {
             return HelperFunction::response(null, null, 'Failed to fetch count: '.$e->getMessage(), 'error', '002', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /** Mark the current user's visible notifications as read. */
+    public function markRead(Request $request)
+    {
+        $validation = Validator::make($request->all(), [
+            'workspace_id' => 'nullable|integer',
+            'notification_id' => 'nullable|integer',
+            'mode' => 'nullable|in:principal,vendor',
+        ]);
+
+        if ($validation->fails()) {
+            return HelperFunction::response(null, null, $validation->errors()->first(), 'error', '001', Response::HTTP_BAD_REQUEST);
+        }
+
+        $user = Auth::user();
+        $vendorIds = Vendor::syncUserVendors($user);
+        $jobOrderIds = JobOrder::whereIn('vendor_id', $vendorIds)
+            ->orWhere('created_by', $user->id)
+            ->pluck('id');
+        $mode = $request->input('mode') ?? $request->header('X-App-Mode') ?? 'principal';
+        $query = Notification::whereNull('read_at');
+
+        if ($mode === 'vendor') {
+            $query->where(function ($q) use ($vendorIds, $jobOrderIds) {
+                $q->whereIn('job_order_id', $jobOrderIds);
+                if (! empty($vendorIds)) {
+                    $q->orWhereIn('vendor_id', $vendorIds);
+                }
+            });
+        } else {
+            $workspaceQuery = Workspace::where(function ($q) use ($user) {
+                    $q->where('owner_id', $user->id)
+                        ->orWhereHas('members', fn ($m) => $m->where('users.id', $user->id));
+                });
+            if ($request->filled('workspace_id')) {
+                $workspaceQuery->where('id', $request->input('workspace_id'));
+            }
+            $workspace = $workspaceQuery->first();
+
+            if (! $workspace) {
+                return HelperFunction::response(null, null, 'Workspace access denied', 'error', '005', Response::HTTP_FORBIDDEN);
+            }
+
+            $query->where('workspace_id', $workspace->id);
+        }
+
+        if ($request->filled('notification_id')) {
+            $query->where('id', $request->integer('notification_id'));
+        }
+
+        $updated = $query->update(['read_at' => now(), 'updated_at' => now()]);
+
+        return HelperFunction::response(['updated' => $updated], null, 'Notifications marked as read', 'success', '000', Response::HTTP_OK);
     }
 }
