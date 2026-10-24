@@ -54,9 +54,11 @@ export const apiClient = {
             ? endpoint
             : `${BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
 
-        // Set a 15-second timeout controller so requests never hang infinitely
+        // Drawing analysis can take longer than ordinary API requests because
+        // the server sends the uploaded file to a vision model.
+        const timeoutMs = endpoint.includes("extract-drawing-specs") ? 120000 : 15000;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
         try {
             const response = await fetch(url, {
@@ -79,7 +81,19 @@ export const apiClient = {
                 }
             }
 
-            const json = await response.json();
+            const responseText = await response.text();
+            let json: any;
+            try {
+                json = responseText ? JSON.parse(responseText) : {};
+            } catch {
+                const errObj: any = new Error(
+                    response.ok
+                        ? "The server returned an invalid response. Please try again."
+                        : `Server error (${response.status}). Please try again or contact support.`
+                );
+                errObj.response = { data: { message: errObj.message }, status: response.status };
+                throw errObj;
+            }
 
             if (!response.ok || json.status === "error") {
                 const errObj: any = new Error(json.message || "Request failed");
@@ -91,8 +105,11 @@ export const apiClient = {
         } catch (err: any) {
             clearTimeout(timeoutId);
             if (err.name === "AbortError") {
-                const timeoutErr: any = new Error("Request timed out. Please try again.");
-                timeoutErr.response = { data: { message: "Request timed out." }, status: 408 };
+                const message = endpoint.includes("extract-drawing-specs")
+                    ? "Drawing analysis is taking too long. Please try again with a smaller file."
+                    : "Request timed out. Please try again.";
+                const timeoutErr: any = new Error(message);
+                timeoutErr.response = { data: { message }, status: 408 };
                 return Promise.reject(timeoutErr);
             }
             return Promise.reject(err);
