@@ -48,7 +48,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   useEffect(() => {
-    document.documentElement.dataset.appMode = appMode;
+    if (window.location.pathname !== '/select-role') {
+      document.documentElement.dataset.appMode = appMode;
+    }
   }, [appMode]);
 
   const setAppMode = (mode: AppMode) => {
